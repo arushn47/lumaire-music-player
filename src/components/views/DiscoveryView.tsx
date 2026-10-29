@@ -17,6 +17,8 @@ import { CatalogTrackActions, type CatalogActionHandlers } from "../common/Catal
 import { DiscoverShelves } from "./DiscoverShelves";
 import type { CommonsDiscoveryState } from "./CommonsDiscovery";
 
+export type SearchCategoryFilter = "songs" | "albums" | "artists";
+
 export interface DiscoveryViewState {
   query: string;
   results: CatalogTrack[];
@@ -28,6 +30,7 @@ export interface DiscoveryViewState {
   error: string;
   scrollTop: number;
   commons: CommonsDiscoveryState;
+  filter?: SearchCategoryFilter;
 }
 
 export const initialDiscoveryViewState = (): DiscoveryViewState => ({
@@ -41,6 +44,7 @@ export const initialDiscoveryViewState = (): DiscoveryViewState => ({
   error: "",
   scrollTop: 0,
   commons: { query: "", results: [], loading: false, error: "" },
+  filter: "songs",
 });
 
 export interface DiscoveryViewProps extends CatalogActionHandlers, EngineSetupProps {
@@ -253,7 +257,8 @@ export function DiscoveryView({
     searchGeneration.current++;
     onStateChange(current => ({ ...current, searching: false }));
   }, []);
-  const { query, results, artists, albums, searchedQuery, entityError, searching, error } = state;
+  const { query, results, artists, albums, searchedQuery, entityError, searching, error, filter } = state;
+  const activeFilter: SearchCategoryFilter = filter || "songs";
 
   useLayoutEffect(() => {
     const main = rootRef.current?.closest("main");
@@ -285,28 +290,29 @@ export function DiscoveryView({
       searchedQuery: trimmed,
       entityError: "",
       error: "",
+      filter: "songs",
     }));
-    void Promise.allSettled([
-      library.searchCatalog(trimmed, 20),
-      library.searchCatalogEntities(trimmed),
-    ]).then(([songs, entities]) => {
-        if (generation !== searchGeneration.current) return;
-        onStateChange((current) => ({
-          ...current,
-          results: songs.status === "fulfilled" ? songs.value : [],
-          artists: entities.status === "fulfilled" ? entities.value.artists : [],
-          albums: entities.status === "fulfilled" ? entities.value.albums : [],
-          entityError: entities.status === "fulfilled" ? entities.value.warning || "" : String(entities.reason),
-          searching: false,
-          error: songs.status === "rejected" ? String(songs.reason) : "",
-        }));
-      });
+    let pending = 2;
+    const finish = () => {
+      if (--pending === 0 && generation === searchGeneration.current)
+        onStateChange(current => ({ ...current, searching: false }));
+    };
+    void library.searchCatalog(trimmed, 20).then(results => {
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, results }));
+    }, error => {
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, error: String(error) }));
+    }).finally(finish);
+    void library.searchCatalogEntities(trimmed).then(entities => {
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: entities.artists, albums: entities.albums, entityError: entities.warning || "" }));
+    }, error => {
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, entityError: String(error) }));
+    }).finally(finish);
   };
 
   useEffect(() => {
     const trimmed = query.trim();
     if (!trimmed) {
-      onStateChange(current => ({ ...current, searching: false, searchedQuery: "", results: [], artists: [], albums: [], error: "", entityError: "" }));
+      onStateChange(current => ({ ...current, searching: false, searchedQuery: "", results: [], artists: [], albums: [], error: "", entityError: "", filter: "songs" }));
       return;
     }
     onStateChange(current => ({ ...current, searching: true }));
@@ -377,6 +383,7 @@ export function DiscoveryView({
                       searchedQuery: "",
                       entityError: "",
                       error: "",
+                      filter: "songs",
                     }));
                   }}
                 >
@@ -486,7 +493,7 @@ export function DiscoveryView({
                       className="explore-card"
                       key={item.name}
                       style={{ backgroundColor: item.color }}
-                      onClick={() => onStateChange((current) => ({ ...current, query: item.name }))}
+                      onClick={() => onStateChange((current) => ({ ...current, query: item.name, filter: "songs" }))}
                     >
                       <img
                         src={item.image}
@@ -506,35 +513,6 @@ export function DiscoveryView({
           </div>
         )}
 
-        {!searching && searchedQuery && (
-          <div className="catalog-search-results">
-            {entityError && <p className="subtitle" role="status">{entityError}</p>}
-            <section aria-label="Artists" className="catalog-search-section">
-              <h2>Artists</h2>
-              {artists.length ? <div className="search-artists">
-                {artists.map(artist => <button key={artist.id} className="search-artist" onClick={() => onNavigateArtist?.(artist.id)}>
-                  <Artwork url={artist.artworkUrl} kind="artist" />
-                  <span>{artist.name}</span>
-                </button>)}
-              </div> : <p className="subtitle">No artist results for this search.</p>}
-            </section>
-            <section aria-label="Albums" className="catalog-search-section">
-              <h2>Albums</h2>
-              {albums.length ? <div className="albums-grid">
-                {albums.map(album => <button key={album.id} className="album-card" aria-label={`Open album ${album.title}`} onClick={() => onNavigateAlbum?.(album.id)}>
-                  <Artwork url={album.artworkUrl} className="album-card-cover" />
-                  <div className="album-card-info">
-                    <div className="album-title" title={album.title}>{album.title}</div>
-                    <div className="album-year" title={`${album.artist}${album.year != null ? ` · ${album.year}` : ""}`}>{album.artist}{album.year != null ? ` · ${album.year}` : ""}</div>
-                  </div>
-                </button>)}
-              </div> : <p className="subtitle">No album results for this search.</p>}
-            </section>
-            <h2>Songs</h2>
-            {!results.length && <p className="subtitle">No song results for this search.</p>}
-          </div>
-        )}
-
         {searching && (
           <div className="empty">
             <Loader2 size={36} className="spin" />
@@ -542,95 +520,203 @@ export function DiscoveryView({
           </div>
         )}
 
-        {!searching && results.length > 0 && (
-          <>
-            <div className="track-header">
-              <span>#</span>
-              <span>TRACK / ARTIST</span>
-              <span>ALBUM</span>
-              <span>TIME</span>
-              <span />
+        {!searching && searchedQuery && (
+          <div className="catalog-search-results">
+            {entityError && <p className="subtitle" role="status">{entityError}</p>}
+
+            <div className="search-filter-pills" role="tablist" aria-label="Search filter">
+              <button
+                type="button"
+                role="tab"
+                id="search-filter-songs"
+                aria-controls="search-results-panel"
+                aria-selected={activeFilter === "songs"}
+                className={`search-filter-pill ${activeFilter === "songs" ? "is-active" : ""}`}
+                onClick={() => onStateChange((current) => ({ ...current, filter: "songs" }))}
+              >
+                <span>Songs</span>
+                {results.length > 0 && <span className="search-pill-count">{results.length}</span>}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="search-filter-albums"
+                aria-controls="search-results-panel"
+                aria-selected={activeFilter === "albums"}
+                className={`search-filter-pill ${activeFilter === "albums" ? "is-active" : ""}`}
+                onClick={() => onStateChange((current) => ({ ...current, filter: "albums" }))}
+              >
+                <span>Albums</span>
+                {albums.length > 0 && <span className="search-pill-count">{albums.length}</span>}
+              </button>
+              <button
+                type="button"
+                role="tab"
+                id="search-filter-artists"
+                aria-controls="search-results-panel"
+                aria-selected={activeFilter === "artists"}
+                className={`search-filter-pill ${activeFilter === "artists" ? "is-active" : ""}`}
+                onClick={() => onStateChange((current) => ({ ...current, filter: "artists" }))}
+              >
+                <span>Artists</span>
+                {artists.length > 0 && <span className="search-pill-count">{artists.length}</span>}
+              </button>
             </div>
-            <div className="track-list">
-              {results.map((t, index) => {
-                const music = t;
-                return (
-                <div className="track-row" key={t.id}>
-                  <button
-                    className="track-play"
-                    aria-label={`Play ${music.title}`}
-                    disabled={busy || !ytdlpAvailable}
-                    onClick={() => onSaveDiscovery(t, "play")}
-                  >
-                    <span className="track-index">
-                      {String(index + 1).padStart(2, "0")}
-                    </span>
-                    <Play className="row-play" size={15} />
-                  </button>
-                  <div
-                    className="track-meta"
-                  >
-                    <Artwork
-                      url={t.artworkUrl}
-                      className={`color-${index % 5}`}
-                    />
-                    <span className="track-meta-text">
-                      <button className="track-title-button" aria-label={`Listen to ${music.title}`} disabled={busy || !ytdlpAvailable} onClick={() => onSaveDiscovery(t, "play")}>
-                        <strong dir="auto" title={t.title}>{music.title}</strong>
-                      </button>
-                      <small dir="auto">
-                        {t.artists && t.artists.length > 0 && onNavigateArtist ? (
-                          <>
-                            {t.artists.map((artist, idx) => (
-                              <span key={idx}>
-                                {idx > 0 && ", "}
-                                {artist.id ? (
-                                  <button
-                                    className="link-button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onNavigateArtist(artist.id!);
-                                    }}
-                                  >
-                                    {artist.name}
-                                  </button>
-                                ) : (
-                                  artist.name
-                                )}
+
+            <div
+              id="search-results-panel"
+              role="tabpanel"
+              aria-labelledby={`search-filter-${activeFilter}`}
+            >
+              {activeFilter === "songs" && (
+                results.length > 0 ? (
+                  <>
+                    <div className="track-header">
+                      <span>#</span>
+                      <span>TRACK / ARTIST</span>
+                      <span>ALBUM</span>
+                      <span>TIME</span>
+                      <span />
+                    </div>
+                    <div className="track-list">
+                      {results.map((t, index) => {
+                        const music = t;
+                        return (
+                          <div
+                            className="track-row"
+                            key={t.id}
+                            onClick={(e) => {
+                              if (busy || !ytdlpAvailable || (e.target as HTMLElement).closest("button, a, summary, details, input, .track-actions, .menu-popover")) return;
+                              onSaveDiscovery(t, "play");
+                            }}
+                          >
+                            <button
+                              className="track-play"
+                              aria-label={`Play ${music.title}`}
+                              disabled={busy || !ytdlpAvailable}
+                              onClick={() => onSaveDiscovery(t, "play")}
+                            >
+                              <span className="track-index">
+                                {String(index + 1).padStart(2, "0")}
                               </span>
-                            ))}
-                          </>
-                        ) : (
-                          music.artist
-                        )}
-                      </small>
-                    </span>
-                  </div>
-                  <span className="album ellipsis" title={music.album}>
-                    {t.albumId && onNavigateAlbum && music.album ? (
+                              <Play className="row-play" size={15} />
+                            </button>
+                            <div className="track-meta">
+                              <Artwork
+                                url={t.artworkUrl}
+                                className={`color-${index % 5}`}
+                              />
+                              <span className="track-meta-text">
+                                <button className="track-title-button" aria-label={`Listen to ${music.title}`} disabled={busy || !ytdlpAvailable} onClick={() => onSaveDiscovery(t, "play")}>
+                                  <strong dir="auto" title={t.title}>{music.title}</strong>
+                                </button>
+                                <small dir="auto">
+                                  {t.artists && t.artists.length > 0 && onNavigateArtist ? (
+                                    <>
+                                      {t.artists.map((artist, idx) => (
+                                        <span key={idx}>
+                                          {idx > 0 && ", "}
+                                          {artist.id ? (
+                                            <button
+                                              className="link-button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                onNavigateArtist(artist.id!);
+                                              }}
+                                            >
+                                              {artist.name}
+                                            </button>
+                                          ) : (
+                                            artist.name
+                                          )}
+                                        </span>
+                                      ))}
+                                    </>
+                                  ) : (
+                                    music.artist
+                                  )}
+                                </small>
+                              </span>
+                            </div>
+                            <span className="album ellipsis" title={music.album}>
+                              {t.albumId && onNavigateAlbum && music.album ? (
+                                <button
+                                  className="link-button"
+                                  onClick={() => onNavigateAlbum(t.albumId!)}
+                                >
+                                  {music.album}
+                                </button>
+                              ) : (
+                                music.album || "—"
+                              )}
+                            </span>
+                            <span className="duration">
+                              {t.duration ? clock(t.duration) : "—"}
+                            </span>
+                            <div className="track-actions">
+                              <CatalogTrackActions track={t} savedTracks={savedTracks} favorites={favorites} onCatalogAction={onCatalogAction} disabled={busy || !ytdlpAvailable} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="library-footer">
+                      <span className="small-dot" /> Music catalogue · {results.length} tracks
+                    </p>
+                  </>
+                ) : (
+                  <p className="subtitle">No song results for this search.</p>
+                )
+              )}
+
+              {activeFilter === "albums" && (
+                albums.length > 0 ? (
+                  <div className="search-albums-grid">
+                    {albums.map((album) => (
                       <button
-                        className="link-button"
-                        onClick={() => onNavigateAlbum(t.albumId!)}
+                        key={album.id}
+                        type="button"
+                        className="album-card"
+                        aria-label={`Open album ${album.title}`}
+                        onClick={() => onNavigateAlbum?.(album.id)}
                       >
-                        {music.album}
+                        <Artwork url={album.artworkUrl} className="album-card-cover" />
+                        <div className="album-card-info">
+                          <div className="album-title" title={album.title}>{album.title}</div>
+                          <div className="album-year" title={`${album.artist}${album.year != null ? ` · ${album.year}` : ""}`}>
+                            {album.artist}{album.year != null ? ` · ${album.year}` : ""}
+                          </div>
+                        </div>
                       </button>
-                    ) : (
-                      music.album || "—"
-                    )}
-                  </span>
-                  <span className="duration">
-                    {t.duration ? clock(t.duration) : "—"}
-                  </span>
-                  <div className="track-actions">
-                    <CatalogTrackActions track={t} savedTracks={savedTracks} favorites={favorites} onCatalogAction={onCatalogAction} disabled={busy || !ytdlpAvailable} />
+                    ))}
                   </div>
-                </div>
-              ); })}
+                ) : (
+                  <p className="subtitle">No album results for this search.</p>
+                )
+              )}
+
+              {activeFilter === "artists" && (
+                artists.length > 0 ? (
+                  <div className="search-artists-grid">
+                    {artists.map((artist) => (
+                      <button
+                        key={artist.id}
+                        type="button"
+                        className="search-artist-card"
+                        aria-label={`Open artist ${artist.name}`}
+                        onClick={() => onNavigateArtist?.(artist.id)}
+                      >
+                        <Artwork url={artist.artworkUrl} kind="artist" />
+                        <span className="search-artist-name" title={artist.name}>{artist.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="subtitle">No artist results for this search.</p>
+                )
+              )}
             </div>
-            <p className="library-footer">
-              <span className="small-dot" /> Music catalogue · {results.length} tracks
-            </p>
-          </>
+          </div>
         )}
       </section>
     </div>

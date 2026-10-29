@@ -1,13 +1,20 @@
+import { localSearchMatches } from "./domain/search";
 import { toggleNativeFullscreen } from "./adapters/fullscreen";
+import {lyricsVersionMatches} from './domain/lyrics';
 import { WindowControls } from "./components/common/WindowControls";
 import { useSyncExternalStore } from "react";
 import { initializeUpdates, getUpdateState, subscribeToUpdates, dismissReleaseNotes, supportsWindowsUpdates } from "./adapters/updater";
 import { MusicLanguageOnboarding } from "./components/modals/MusicLanguageOnboarding";
 import { UpdateDialog } from "./components/modals/UpdateDialog";
+import { SourceChooser } from './components/modals/SourceChooser';
+import { prepareCatalogCandidate } from './player/service';
+import { matchSource } from './domain/source-matching';
 import { downloadProgressText } from "./domain/downloads";
 import { mergePlaylistImport, type PlaylistImportOptions } from "./domain/playlist-import";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { flushSync } from 'react-dom';
+import { useExpandedLayout } from './hooks/useExpandedLayout';
+import { usePlayerHistory } from './hooks/usePlayerHistory';
 import { dismissAndroidLayer, useAndroidBack } from './hooks/useAndroidBack';
 import { Disc3, Minimize2 } from "lucide-react";
 import { desktop, mobile, library, type CatalogTrack } from "./adapters/native";
@@ -53,7 +60,7 @@ import { emit } from "@tauri-apps/api/event";
 import type { CatalogAction } from "./components/common/CatalogTrackActions";
 import { EngineSetupDialog } from "./components/modals/EngineSetupDialog";
 import { clearDiscoverySearches } from "./adapters/discovery-home";
-import { catalogQueueTrack } from "./domain/catalog-track";
+import { canonicalTrack, catalogQueueTrack } from "./domain/catalog-track";
 import { CollectionHub } from "./components/views/CollectionHub";
 import { useNearby } from "./hooks/useNearby";
 import { useJam } from "./hooks/useJam";
@@ -77,6 +84,7 @@ type View =
   | string;
 
 export function App() {
+  const expandedLayout = useExpandedLayout();
   const libraryManager = useLibraryManager();
   const {
     tracks,
@@ -257,6 +265,10 @@ export function App() {
   }, [queueWidth]);
   const [isResizingQueue, setIsResizingQueue] = useState(false);
   const [dialog, setDialog] = useState<PromptDialogData | null>(null);
+  const [sourceChooser,setSourceChooser] = useState<{catalogId:string;entryId:string|null}|null>(null);
+  useEffect(()=>{
+    if(sourceChooser&&(sourceChooser.entryId===null ? libraryManager.pendingTrack?.id!==sourceChooser.catalogId : session.currentId!==sourceChooser.entryId))setSourceChooser(null);
+  },[session.currentId,sourceChooser,libraryManager.pendingTrack?.id]);
   const [playlistTarget, setPlaylistTarget] = useState<Track | null>(null);
   const [addMusicPlaylist, setAddMusicPlaylist] = useState<Playlist | null>(null);
   const listeningHistory = useListeningHistory(
@@ -294,7 +306,8 @@ export function App() {
     ),
   ];
   const track = listeningTracks.find((t) => t.id === current?.trackId);
-  const doc = track ? session.lyrics[track.id] : undefined;
+  const savedDoc = track ? session.lyrics[track.id] : undefined;
+  const doc = savedDoc && track && lyricsVersionMatches(savedDoc,track.title) ? savedDoc : undefined;
 
   useEffect(() => {
     scrollPositions.current.set("lyrics", 0);
@@ -309,6 +322,8 @@ export function App() {
   useEffect(() => { if (updateState.unreadNotes) setUpdatesOpen(true); }, [updateState.unreadNotes]);
   const closeUpdates = () => { dismissReleaseNotes(); setUpdatesOpen(false); };
   const [expanded, setExpanded] = useState(false);
+  const dismissPlayer = useCallback(() => setExpanded(false), []);
+  usePlayerHistory(expanded, dismissPlayer);
   const [mobilePlayerTab, setMobilePlayerTab] = useState<"player" | "queue">("player");
   function openExpanded() { setMobilePlayerTab("player"); setExpanded(true); }
   function closeExpanded() { setExpanded(false); requestAnimationFrame(() => document.querySelector<HTMLButtonElement>(".cover-expand, .mobile-cover-expand")?.focus()); }
@@ -396,11 +411,11 @@ export function App() {
     tracksRef,
     tracks,
     currentTrack: track,
-    view: expanded && !mobile ? "lyrics" : typeof view === "object" ? "discover" : view,
+    view: expanded && expandedLayout ? "lyrics" : typeof view === "object" ? "discover" : view,
     setView: selectView,
     notify,
     persist,
-    dialogOpen: Boolean(dialog || playlistTarget || collectionHub || updatesOpen),
+    dialogOpen: Boolean(dialog || playlistTarget || collectionHub || updatesOpen || sourceChooser),
     onSetFollow: (f) => followRef.current(f),
     onToggleQueue: () => setQueueOpen((q) => !q),
     queueOpen,
@@ -414,7 +429,7 @@ export function App() {
     update,
     sessionRef,
     ready,
-    view: expanded && !mobile && window.innerWidth > 768 ? "lyrics" : typeof view === "object" ? "discover" : view,
+    view: expanded && expandedLayout ? "lyrics" : typeof view === "object" ? "discover" : view,
     notify,
     action,
     setError,
@@ -446,6 +461,9 @@ export function App() {
     libraryManager.pendingTrack.id === playback.trackId,
   );
   const activeTrack = pendingTrackActive ? libraryManager.pendingTrack : track;
+  const correctionCatalog = activeTrack?.metadataSourceId || (activeTrack?.format==='catalog'?activeTrack.id:null);
+  const wrongVersion = correctionCatalog && activeTrack && !activeTrack.offline && (activeTrack.format==='catalog'||activeTrack.id.startsWith('youtube:'))
+    ? ()=>setSourceChooser({catalogId:correctionCatalog,entryId:pendingTrackActive?null:session.currentId}) : undefined;
 
   // Sync live lyrics to native Android widgets when available
   useEffect(() => {
@@ -702,11 +720,8 @@ export function App() {
         collection?.tracks.some((candidate) => candidate.id === t.id)) &&
       (!playlist || playlist.items.some((i) => i.trackId === t.id)),
   );
-  const visible = collectionTracks.filter(t =>
-      `${t.title} ${t.artist} ${t.album?.trim() || "Unknown"}`
-        .toLocaleLowerCase()
-        .includes(query.toLocaleLowerCase()),
-  );
+  const visible = collectionTracks.filter(t => localSearchMatches(query, t.title, t.artist, t.album || ""));
+
   const heading =
     view === "history"
       ? "Tracker"
@@ -766,6 +781,7 @@ export function App() {
               onSeek={(seconds) => seek(seconds)}
             />);
   const playerControls = (<PlayerBar onExpand={openExpanded}
+        onWrongVersion={wrongVersion}
         autoplayLoading={playbackEngine.autoplayLoading}
         onFloatingLyrics={floatingLyrics.supported ? floatingLyrics.toggle : undefined}
         floatingLyricsOpen={floatingLyrics.open}
@@ -923,6 +939,19 @@ export function App() {
         </button>
       )}
       {updatesOpen && <UpdateDialog onClose={closeUpdates} />}
+      {sourceChooser && <SourceChooser key={`${sourceChooser.catalogId}:${sourceChooser.entryId}`} catalogId={sourceChooser.catalogId}
+        active={()=>sourceChooser.entryId===null ? libraryManager.pendingTrack?.id===sourceChooser.catalogId : sessionRef.current.currentId===sourceChooser.entryId}
+        onChoose={async(catalog,source)=>{
+          if(sourceChooser.entryId!==null){await playbackEngine.chooseRecording(catalog,source,sourceChooser.entryId);return;}
+          const request=player.state.playbackId;
+          const candidate={...source,...await prepareCatalogCandidate(source)};
+          if(!(await matchSource(catalog,candidate)).accepted)throw Error('This recording no longer matches the selected song.');
+          if(player.state.playbackId!==request||libraryManager.pendingTrack?.id!==catalog.id)throw Error('Playback selection changed.');
+          await library.setVerifiedSource(catalog.id,{sourceId:candidate.id,sourceProvider:'youtube',title:candidate.title,artist:candidate.channel,duration:candidate.duration,userSelected:true});
+          if(player.state.playbackId!==request)return;
+          libraryManager.clearPendingPlayback();playTrack(canonicalTrack(catalog,candidate));
+        }}
+        onClose={()=>setSourceChooser(null)} />}
       {ready && needsEngineSetup && engineSetup.engineState !== "checking" && <EngineSetupDialog {...engineSetup} />}
       <a className="skip-link" href="#main">
         Skip to content
@@ -946,6 +975,7 @@ export function App() {
         }}
         view={typeof view === "object" ? "discover" : view}
         onOpenSync={() => setCollectionHub("import")}
+        onSearch={openDiscoverSearch}
         setView={selectView}
         collectionsCount={session.playlists.length}
         playlists={session.playlists}
@@ -953,7 +983,7 @@ export function App() {
         hasLyricsDoc={Boolean(doc)}
         queueOpen={queueOpen}
         onToggleQueue={() => {
-          if (mobile || window.innerWidth <= 768) { setMobilePlayerTab("queue"); setExpanded(true); }
+          if (!expandedLayout) { setMobilePlayerTab("queue"); setExpanded(true); }
           else setQueueOpen((x) => !x);
         }}
         onCreatePlaylist={handleCreatePlaylist}
@@ -992,7 +1022,9 @@ export function App() {
             onSelectArtist={id => navigateCatalog({ type: "artist", id })}
             onSelectAlbum={id => navigateCatalog({ type: "album", id })}
             onSelectTrack={result => handleCatalogTrack(result, "play")}
-
+            onCatalogAction={handleCatalogAction}
+            favorites={session.favorites}
+            savedTracks={tracks}
           />
         )}
         <Banners
@@ -1012,7 +1044,8 @@ export function App() {
             setMessageAction(null);
           }}
         />
-        <main id="main" tabIndex={-1}>
+        <div className="workspace-body">
+          <main id="main" tabIndex={-1}>
           {!ready && (
             <div className="empty">
               <Disc3 className="spin" size={32} />
@@ -1037,6 +1070,7 @@ export function App() {
                 visible={visible}
                 rows={rows}
                 currentTrack={track}
+                playbackDuration={playback.duration}
                 playbackStatus={playback.status}
                 session={session}
                 downloads={downloads}
@@ -1213,6 +1247,10 @@ lyricsPanel
                 favoriteAlbums={session.favoriteAlbums.map(album => album.title)}
                 downloads={downloads}
                 onCatalogAction={handleCatalogAction}
+                onFavorite={t => favorite(t.id, t)}
+                onQueueTrack={handleQueueRemote}
+                onSaveOnline={t => void action(async () => { await saveOnline(t); })}
+                onChoosePlaylist={choosePlaylist}
               />
             </div>
           )}
@@ -1402,37 +1440,38 @@ lyricsPanel
               onDeleteOffline={(t) => deleteOffline(t, track?.id, ask)}
             />
           )}
-        </main>
+          </main>
+          {queueOpen && (
+            <QueuePanel
+              session={session}
+              listeningTracks={listeningTracks}
+              undo={undo}
+              onClose={() => setQueueOpen(false)}
+              onSelectQueue={(id, play) => selectQueue(id, play)}
+              onReorderUpcoming={(id, delta) =>
+                update((s) => reorderUpcoming(s, id, delta))
+              }
+              onRemoveQueue={(id) => removeQueue(id)}
+              onUndoRemoval={undoRemoval}
+              onClearQueue={clearQueue}
+              onNavigateArtist={id => navigateCatalog({ type: "artist", id })}
+              currentTrack={activeTrack}
+              playback={playback}
+              onTogglePlay={() => {
+                if (pendingTrackActive && playback.status === "error") libraryManager.retryPendingPlayback(playTrack);
+                else togglePlay();
+              }}
+              onFavorite={favorite}
+              isFavorite={Boolean(activeTrack && session.favorites.includes(activeTrack.id))}
+              onChoosePlaylist={choosePlaylist}
+              onResizeStart={handleQueueResizeStart}
+              onResizeReset={handleQueueResizeReset}
+            />
+          )}
+        </div>
       </div>
-      {queueOpen && (
-        <QueuePanel
-          session={session}
-          listeningTracks={listeningTracks}
-          undo={undo}
-          onClose={() => setQueueOpen(false)}
-          onSelectQueue={(id, play) => selectQueue(id, play)}
-          onReorderUpcoming={(id, delta) =>
-            update((s) => reorderUpcoming(s, id, delta))
-          }
-          onRemoveQueue={(id) => removeQueue(id)}
-          onUndoRemoval={undoRemoval}
-          onClearQueue={clearQueue}
-          onNavigateArtist={id => navigateCatalog({ type: "artist", id })}
-          currentTrack={activeTrack}
-          playback={playback}
-          onTogglePlay={() => {
-            if (pendingTrackActive && playback.status === "error") libraryManager.retryPendingPlayback(playTrack);
-            else togglePlay();
-          }}
-          onFavorite={favorite}
-          isFavorite={Boolean(activeTrack && session.favorites.includes(activeTrack.id))}
-          onChoosePlaylist={choosePlaylist}
-          onResizeStart={handleQueueResizeStart}
-          onResizeReset={handleQueueResizeReset}
-        />
-      )}
       {!expanded && playerControls}
-      {expanded && (!mobile && (typeof window === "undefined" || window.innerWidth > 768)) && (
+      {expanded && expandedLayout && (
         <ExpandedPlayer
           follow={lyricsEngine.follow}
           setFollow={lyricsEngine.setFollow}
@@ -1450,8 +1489,10 @@ lyricsPanel
           onToggleFullscreen={toggleFullscreen}
         />
       )}
-      {expanded && (mobile || (typeof window !== "undefined" && window.innerWidth <= 768)) && (
+      {expanded && !expandedLayout && (
         <MobileNowPlaying
+          onWrongVersion={wrongVersion}
+          manageHistory={false}
           initialTab={mobilePlayerTab}
           track={activeTrack || track}
           tracks={tracks}

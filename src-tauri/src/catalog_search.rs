@@ -1,5 +1,5 @@
 //! Provider composition only. Audio identity is still verified by the playback resolver.
-use crate::{catalog::{self, AlbumDetails, ArtistDetails, CatalogAlbum, CatalogEntities}, itunes_metadata::{self, CatalogTrack}, lyric_identity};
+use crate::{catalog::{self, AlbumDetails, ArtistDetails, CatalogAlbum, CatalogArtist, CatalogEntities}, itunes_metadata::{self, CatalogTrack}, lyric_identity};
 use std::{collections::HashMap, sync::{Arc, Mutex, OnceLock}, time::{Duration, Instant}};
 
 const SAAVN: &str = "https://www.jiosaavn.com/api.php";
@@ -36,6 +36,18 @@ fn catalog_title(title: &str) -> String {
     static COLLABORATION: OnceLock<regex::Regex> = OnceLock::new();
     COLLABORATION.get_or_init(|| regex::Regex::new(r"(?i)\s*[\[(](?:with|feat\.?|ft\.?|featuring)\s+[^\])]+[\])]").unwrap()).replace_all(title, "").into_owned()
 }
+fn one_edit(left: &str, right: &str) -> bool {
+    if !left.is_ascii() || !right.is_ascii() || left.len() < 5 || right.len() < 5 || left.len().abs_diff(right.len()) > 1 { return false; }
+    let (a,b)=(left.as_bytes(),right.as_bytes());
+    let (mut i,mut j,mut edits)=(0,0,0);
+    while i<a.len() && j<b.len() {
+        if a[i]==b[j] { i+=1;j+=1;continue; }
+        edits+=1;if edits>1 { return false; }
+        if a.len()==b.len() && i+1<a.len() && a[i]==b[j+1] && a[i+1]==b[j] { i+=2;j+=2; }
+        else { if a.len()>=b.len(){i+=1;} if b.len()>=a.len(){j+=1;} }
+    }
+    edits+usize::from(i<a.len() || j<b.len())<=1
+}
 pub fn relevance(query: &str, title: &str, artist: &str) -> u32 {
     let q = lyric_identity::fingerprint(query);
     if q.is_empty() { return 0; }
@@ -47,18 +59,39 @@ pub fn relevance(query: &str, title: &str, artist: &str) -> u32 {
     if q == artist_key || catalog::artist_names(artist).iter().any(|credit| lyric_identity::fingerprint(credit) == q) { return 900; }
     let haystack = format!("{title_key}{artist_key}");
     let terms: Vec<_> = query.split(|c: char| !c.is_alphanumeric() && !matches!(c, '\u{094d}' | '\u{0d4d}')).filter(|word| !word.is_empty() && !["and", "with", "featuring", "feat", "ft"].contains(&word.to_lowercase().as_str())).collect();
-    if terms.is_empty() || !terms.iter().all(|word| haystack.contains(&lyric_identity::fingerprint(word))) { return 0; }
+    if terms.is_empty() || terms.len()>12 { return 0; }
+    if !terms.iter().all(|word| haystack.contains(&lyric_identity::fingerprint(word))) {
+        let words: Vec<_> = title.split(|c:char|!c.is_alphanumeric()).chain(artist.split(|c:char|!c.is_alphanumeric())).filter(|word|!word.is_empty()).map(str::to_lowercase).collect();
+        let mut corrected=0;
+        for term in &terms {
+            let term=term.to_lowercase();
+            if words.iter().any(|word|word==&term) { continue; }
+            if !words.iter().any(|word|one_edit(&term,word)) { return 0; }
+            corrected+=1;
+        }
+        return if corrected==1 { 50 } else { 0 };
+    }
     100 + if title_key.contains(&q) { 100 } else { 0 }
 }
 fn credits(track: &CatalogTrack) -> Vec<String> {
-    let names = if track.artists.is_empty() { catalog::artist_names(&track.artist) } else { track.artists.iter().flat_map(|credit| catalog::artist_names(&credit.name)).collect() };
+    let names = if track.artists.is_empty() { catalog::artist_names(&track.artist) } else { track.artists.iter().map(|credit| credit.name.clone()).collect() };
     names.iter().map(|name| lyric_identity::fingerprint(name)).filter(|name| !name.is_empty()).collect()
 }
 pub(crate) fn same_recording(a: &CatalogTrack, b: &CatalogTrack) -> bool {
     if a.id == b.id { return true; }
-    if lyric_identity::title(&catalog_title(&a.title)) != lyric_identity::title(&catalog_title(&b.title)) || a.duration <= 0.0 || b.duration <= 0.0 || (a.duration - b.duration).abs() > 3.0 { return false; }
+    if let (Some(left), Some(right)) = (&a.recording_metadata, &b.recording_metadata) {
+        if !left.isrcs.is_empty() && !right.isrcs.is_empty() && !left.isrcs.iter().any(|code| right.isrcs.contains(code)) { return false; }
+    }
+    static VERSIONS: OnceLock<regex::Regex> = OnceLock::new();
+    let versions = VERSIONS.get_or_init(|| regex::Regex::new(r"(?i)\b(?:live|remix|acoustic|instrumental|karaoke|cover|demo|remaster(?:ed)?|radio\s+edit|extended|sped\s+up|slowed|reprise|female|male)\b").unwrap());
+    let labels = |title: &str| { let mut labels: Vec<_> = versions.find_iter(title).map(|label| label.as_str().to_lowercase()).collect(); labels.sort(); labels.dedup(); labels };
+    if labels(&a.title) != labels(&b.title) { return false; }
+    if let (Some(left), Some(right)) = (&a.language, &b.language) {
+        if !left.trim().is_empty() && !right.trim().is_empty() && !left.trim().eq_ignore_ascii_case(right.trim()) { return false; }
+    }
+    if lyric_identity::title(&catalog_title(&a.title)) != lyric_identity::title(&catalog_title(&b.title)) || !a.duration.is_finite() || !b.duration.is_finite() || a.duration <= 0.0 || b.duration <= 0.0 || (a.duration - b.duration).abs() > 3.0 { return false; }
     let left = credits(a); let right = credits(b);
-    !left.is_empty() && !right.is_empty() && (left[0] == right[0] || left.iter().all(|name| right.contains(name)) || right.iter().all(|name| left.contains(name)))
+    !left.is_empty() && !right.is_empty() && left.iter().all(|name| right.contains(name)) && right.iter().all(|name| left.contains(name))
 }
 fn usable(query: &str, track: &CatalogTrack) -> bool {
     let artist = track.artist.to_lowercase();
@@ -69,7 +102,7 @@ fn usable(query: &str, track: &CatalogTrack) -> bool {
 pub(crate) fn merge_songs(query: &str, primary: Vec<CatalogTrack>, secondary: Vec<CatalogTrack>, limit: usize) -> Vec<CatalogTrack> {
     let rank = |tracks: Vec<CatalogTrack>| tracks.into_iter().enumerate().map(|(index, track)| {
         let keyword = relevance(query, &track.title, &track.artist);
-        let keyword_score = if keyword >= 900 { 330 } else { 200 + keyword.saturating_sub(100) / 2 };
+        let keyword_score = keyword * 1000;
         // Apple exposes no play counts; preserve provider rank and use neutral missing popularity.
         let popularity = track.play_count.map(|count| ((count as f64).ln_1p() * 8.0).min(160.0) as u32).unwrap_or(80);
         let provider_rank = 100u32.saturating_sub(index as u32 * 3);
@@ -84,6 +117,8 @@ pub(crate) fn merge_songs(query: &str, primary: Vec<CatalogTrack>, secondary: Ve
                 || lyric_identity::fingerprint(&old.album) == lyric_identity::fingerprint(&track.album))) {
             *old_score = (*old_score).max(score);
             if old.artwork_url.is_none() { old.artwork_url = track.artwork_url; }
+            if old.language.as_ref().is_none_or(|value| value.trim().is_empty()) { old.language = track.language; }
+            if old.genre.as_ref().is_none_or(|value| value.trim().is_empty()) { old.genre = track.genre; }
         } else { result.push((track, score)); }
     }
     result.sort_by_key(|(_, score)| std::cmp::Reverse(*score));
@@ -112,6 +147,44 @@ fn merge_albums(primary: Vec<CatalogAlbum>, secondary: Vec<CatalogAlbum>) -> Vec
     for album in secondary { if !rows.iter().any(|old| same_album(old, &album)) { rows.push(album); } }
     rows
 }
+fn credited_artists(candidates: Vec<CatalogArtist>, mut credited: Vec<CatalogArtist>) -> Vec<CatalogArtist> {
+    // Artist search also returns empty publishing entities; require a performing credit on a returned song.
+    for artist in &mut credited {
+        if artist.id.contains(":name:") {
+            let matches: Vec<_> = candidates.iter().filter(|candidate| !candidate.id.contains(":name:") && catalog::same_name(&candidate.name, &artist.name)).collect();
+            if matches.len() == 1 {
+                artist.id = matches[0].id.clone();
+                artist.name = matches[0].name.clone();
+            }
+        }
+        if artist.artwork_url.is_none() {
+            artist.artwork_url = candidates.iter().find(|candidate| candidate.id == artist.id).and_then(|candidate| candidate.artwork_url.clone());
+        }
+    }
+    let resolved:Vec<_>=credited.iter().filter(|artist|!artist.id.contains(":name:")).map(|artist|artist.name.to_lowercase()).collect();
+    let mut seen=std::collections::HashSet::new();
+    credited.retain(|artist|(!artist.id.contains(":name:")||!resolved.contains(&artist.name.to_lowercase()))&&seen.insert(artist.id.clone()));
+    credited
+}
+
+fn group_artist_recordings(artists: &mut Vec<CatalogArtist>, tracks: &[CatalogTrack]) {
+    let mut remove = std::collections::HashSet::new();
+    for apple in artists.iter().filter(|artist| artist.id.starts_with("itunes:")) {
+        let matches: Vec<_> = artists.iter().filter(|other| other.id.starts_with("saavn:artist:") && catalog::same_name(&apple.name, &other.name)).filter(|other| {
+            let credited = |track: &&CatalogTrack, id: &str| track.artists.iter().any(|credit| credit.id.as_deref() == Some(id));
+            let mut recordings: Vec<&CatalogTrack> = Vec::new();
+            for track in tracks.iter().filter(|track| credited(track, &apple.id)) {
+                if tracks.iter().filter(|candidate| credited(candidate, &other.id)).any(|candidate| same_recording(track, candidate))
+                    && !recordings.iter().any(|old| same_recording(old, track)) { recordings.push(track); }
+            }
+            // shortcut: two strict recording overlaps prove grouping; sparse catalogues remain separate.
+            recordings.len() >= 2
+        }).collect();
+        if matches.len() == 1 { remove.insert(apple.id.clone()); }
+    }
+    artists.retain(|artist| !remove.contains(&artist.id));
+}
+
 pub async fn entities(query: &str) -> Result<CatalogEntities, String> {
     let key = format!("entities:{}", query.trim().to_lowercase()); let _guard = flight(&key).await;
     if let Some(Value::Entities(rows)) = cached(&key) { return Ok(rows); }
@@ -122,13 +195,28 @@ pub async fn entities(query: &str) -> Result<CatalogEntities, String> {
     }
     let complete = saavn.is_ok() && apple.is_ok();
     let empty = || CatalogEntities { artists: vec![], albums: vec![], warning: None };
-    let mut primary = saavn.unwrap_or_else(|_| empty()); let secondary = apple.unwrap_or_else(|_| empty());
-    primary.artists.retain(|artist| relevance(query, &artist.name, "") > 0);
-    for artist in secondary.artists {
-        if let Some(old) = primary.artists.iter_mut().find(|old| lyric_identity::fingerprint(&old.name) == lyric_identity::fingerprint(&artist.name)) {
-            if old.id.contains(":name:") && !artist.id.contains(":name:") { *old = artist; }
-        } else { primary.artists.push(artist); }
+    let mut primary = saavn.unwrap_or_else(|_| empty()); let mut secondary = apple.unwrap_or_else(|_| empty());
+    // Same-name artists can be absent from the first song-search page; verify their own music instead.
+    let mut evidence = match cached(&format!("songs:{}", query.trim().to_lowercase())) { Some(Value::Songs(rows)) => rows, _ => vec![] };
+    let mut checks=tokio::task::JoinSet::new();
+    for candidate in primary.artists.iter().chain(secondary.artists.iter().filter(|artist|artist.id.starts_with("itunes:"))).filter(|artist|catalog::same_name(&artist.name,query)&&!artist.id.contains(":name:")).take(6) {
+        let id=candidate.id.clone();
+        checks.spawn(async move {
+            if let Some(Value::Artist(details)) = cached(&format!("artist-proof:{id}")) { return Ok(details); }
+            if id.starts_with("itunes:") { bounded(6,itunes_metadata::lookup_artist(id)).await }
+            else { bounded(6,catalog::lookup_saavn_artist(SAAVN,&id)).await }
+        });
     }
+    while let Some(result)=checks.join_next().await {
+        if let Ok(Ok(details))=result {
+            save(&format!("artist-proof:{}",details.info.id),Value::Artist(details.clone()),true);
+            evidence.extend(details.top_tracks.clone());
+            secondary.artists.push(details.info.clone());
+            save(&format!("artist:{}",details.info.id),Value::Artist(details),true);
+        }
+    }
+    primary.artists = credited_artists(primary.artists, secondary.artists);
+    group_artist_recordings(&mut primary.artists, &evidence);
     primary.artists.sort_by_key(|artist| std::cmp::Reverse(relevance(query, &artist.name, ""))); primary.artists.truncate(6);
     primary.albums.retain(|album| relevance(query, &album.title, &album.artist) > 0);
     primary.albums = merge_albums(primary.albums, secondary.albums);
@@ -196,8 +284,100 @@ pub async fn album(id: &str) -> Result<AlbumDetails, String> {
 mod tests {
     use super::*;
     fn song(id: &str, title: &str, artist: &str, duration: f64) -> CatalogTrack {
-        CatalogTrack { play_count: None, id: id.into(), title: title.into(), artist: artist.into(), artists: catalog::artist_names(artist).into_iter().map(|name| itunes_metadata::CatalogArtistCredit { name, id: None }).collect(), artist_id: None, album: "Release".into(), album_id: None, duration, artwork_url: None, genre: None, language: None }
+        CatalogTrack { recording_metadata: None, play_count: None, id: id.into(), title: title.into(), artist: artist.into(), artists: catalog::artist_names(artist).into_iter().map(|name| itunes_metadata::CatalogArtistCredit { name, id: None }).collect(), artist_id: None, album: "Release".into(), album_id: None, duration, artwork_url: None, genre: None, language: None }
     }
+    #[test]
+    fn lexical_recovery_is_bounded_and_preserves_intent() {
+        assert_eq!(relevance("kesaryia", "Kesariya", "Arijit Singh"),50);
+        assert_eq!(relevance("kesariy", "Kesariya", "Arijit Singh"),200);
+        assert_eq!(relevance("cat", "Car", "Singer"),0);
+        assert_eq!(relevance("kesaryia wrong", "Kesariya", "Arijit Singh"),0);
+        let rows=merge_songs("Kesariya",vec![song("saavn:1","Other","Kesariya",180.0)],vec![song("itunes:1","Kesariya","Arijit Singh",180.0)],20);
+        assert_eq!(rows[0].title,"Kesariya");
+    }
+    #[test]
+    fn metadata_merge_preserves_versions_complete_credits_languages_and_existing_values() {
+        let base = song("saavn:abcd1234", "Evening Song", "Singer & Guest", 180.0);
+        for (title, artist, language) in [
+            ("Evening Song", "Singer & Other", None),
+            ("Evening Song", "Singer", None),
+            ("Evening Song (feat. Guest) [Live]", "Singer & Guest", None),
+            ("Evening Song (Female Version)", "Singer & Guest", None),
+            ("Evening Song", "Singer & Guest", Some("telugu")),
+        ] {
+            let mut original = base.clone(); original.language = Some("tamil".into());
+            let mut other = song("itunes:2", title, artist, 180.0); other.language = language.map(str::to_owned);
+            assert!(!same_recording(&original, &other), "{title}: {artist}");
+        }
+        let mut extra = song("itunes:2", "Evening Song", "Guest & Singer", 181.0);
+        let mut identified = base.clone();
+        identified.recording_metadata = crate::recording_metadata::from_provider(identified.id.clone(), &serde_json::json!("USABC2412345"), None, &serde_json::Value::Null);
+        extra.recording_metadata = crate::recording_metadata::from_provider(extra.id.clone(), &serde_json::json!("USABC2499999"), None, &serde_json::Value::Null);
+        assert!(!same_recording(&identified,&extra));
+        extra.recording_metadata = None;
+        extra.language = Some("tamil".into()); extra.genre = Some("Pop".into());
+        let rows = merge_songs("Evening Song", vec![base.clone()], vec![extra.clone()], 20);
+        assert_eq!(rows.len(), 1); assert_eq!(rows[0].id, base.id);
+        assert_eq!(rows[0].language.as_deref(), Some("tamil"));
+        assert_eq!(rows[0].genre.as_deref(), Some("Pop"));
+        assert_eq!(rows[0].duration, 180.0); assert_eq!(rows[0].artist, base.artist);
+        let mut original = base; original.genre = Some("User genre".into());
+        assert_eq!(merge_songs("Evening Song", vec![original], vec![extra], 20)[0].genre.as_deref(), Some("User genre"));
+    }
+
+    #[test]
+    fn artist_results_require_song_credits_and_preserve_provider_identity() {
+        let artist = |id: &str, name: &str| CatalogArtist { id: id.into(), name: name.into(), artwork_url: Some("https://c.saavncdn.com/artist.jpg".into()) };
+        let candidates = vec![artist("saavn:artist:4481068", "Hola Amigos"), artist("saavn:artist:13345690", "Jackie Young Music/Hola Amigo Songs"), artist("saavn:artist:9", "KR$NA")];
+        assert!(credited_artists(candidates.clone(), vec![]).is_empty());
+        let mut track = song("saavn:abcd1234", "Hola Amigo", "KR$NA", 226.0);
+        track.artists[0].id = Some("saavn:artist:9".into());
+        let supported = itunes_metadata::entities_from_tracks("KR$NA", vec![track]).artists;
+        let result = credited_artists(candidates, supported);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].id, "saavn:artist:9");
+        assert!(result[0].artwork_url.is_some());
+        assert!(itunes_metadata::entities_from_tracks("Hola Amigo", vec![song("saavn:abcd1234", "Hola Amigo", "KR$NA", 226.0)]).artists.is_empty());
+    }
+    #[test]
+    fn same_name_artists_keep_distinct_ids_and_matching_portraits() {
+        let mut first=song("itunes:1","First","Gini",180.0);first.artists[0].id=Some("saavn:artist:1249318".into());
+        let mut second=first.clone();second.id="itunes:2".into();second.artists[0].id=Some("saavn:artist:20043211".into());
+        let mut results=itunes_metadata::entities_from_tracks("Gini",vec![first,second]);
+        assert_eq!(results.artists.len(),2);
+        results.artists.push(CatalogArtist{id:"artist:name:Gini".into(),name:"Gini".into(),artwork_url:None});
+        let portrait=CatalogArtist{id:"saavn:artist:20043211".into(),name:"Gini".into(),artwork_url:Some("https://c.saavncdn.com/artists/Gini.jpg".into())};
+        let results=credited_artists(vec![portrait],results.artists);
+        assert_eq!(results.len(),2);
+        assert!(results[0].artwork_url.is_none());assert!(results[1].artwork_url.is_some());
+    }
+
+    #[test]
+    fn cross_provider_artist_grouping_requires_two_distinct_strict_recordings() {
+        let artist = |id: &str| CatalogArtist { id:id.into(), name:"Gini".into(), artwork_url:None };
+        let originals=vec![artist("itunes:1"),artist("saavn:artist:2"),artist("saavn:artist:3")];
+        let track = |id: &str, title: &str, artist_id: &str| { let mut row=song(id,title,"Gini",180.0);row.artists[0].id=Some(artist_id.into());row };
+        let mut tracks=vec![track("itunes:a","Sukoon","itunes:1"),track("saavn:a","Sukoon","saavn:artist:2")];
+        let mut rows=originals.clone();group_artist_recordings(&mut rows,&tracks);assert_eq!(rows.len(),3);
+        tracks.push(track("saavn:duplicate","Sukoon","saavn:artist:2"));
+        let mut rows=originals.clone();group_artist_recordings(&mut rows,&tracks);assert_eq!(rows.len(),3);
+        tracks.extend([track("itunes:b","Aashiyan","itunes:1"),track("saavn:b","Aashiyan (Live)","saavn:artist:2")]);
+        let mut rows=originals.clone();group_artist_recordings(&mut rows,&tracks);assert_eq!(rows.len(),3);
+        tracks.last_mut().unwrap().title="Aashiyan".into();
+        let mut rows=originals;group_artist_recordings(&mut rows,&tracks);
+        assert_eq!(rows.iter().map(|row|row.id.as_str()).collect::<Vec<_>>(),vec!["saavn:artist:2","saavn:artist:3"]);
+    }
+
+    #[test]
+    fn named_gini_credit_reuses_unique_exact_provider_artist_without_substring_matches() {
+        let artist = |id: &str, name: &str| CatalogArtist { id:id.into(),name:name.into(),artwork_url:None };
+        let credited = vec![artist("artist:name:gini", "gini")];
+        let result=credited_artists(vec![artist("saavn:artist:42","Gini"),artist("saavn:artist:43","Ginikachukwu")],credited.clone());
+        assert_eq!(result[0].id,"saavn:artist:42");assert_eq!(result[0].name,"Gini");
+        let ambiguous=credited_artists(vec![artist("saavn:artist:42","Gini"),artist("saavn:artist:44","gini")],credited);
+        assert_eq!(ambiguous[0].id,"artist:name:gini");
+    }
+
     #[test]
     fn song_search_keeps_original_release_and_remix_instead_of_only_a_compilation() {
         let mut compilation = song("saavn:abcd1234", "Evening Song", "Singer & Guest", 230.0);
@@ -243,7 +423,7 @@ mod tests {
     #[test]
     fn dedup_requires_recording_version_credits_and_duration_and_prefers_primary() {
         let primary = song("saavn:abcd1234", "Wishes", "Hasan Raheem, Umair & Talwiinder", 219.0);
-        let same = song("itunes:1", "Wishes", "Hasan Raheem & Talwiinder", 218.0);
+        let same = song("itunes:1", "Wishes", "Hasan Raheem, Umair & Talwiinder", 218.0);
         let live = song("itunes:2", "Wishes (Live)", "Hasan Raheem", 219.0);
         let another = song("itunes:3", "Wishes", "Other Singer", 219.0);
         let longer = song("itunes:4", "Wishes", "Hasan Raheem", 250.0);
