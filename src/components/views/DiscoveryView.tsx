@@ -1,3 +1,4 @@
+import { searchRetrieval } from "../../domain/search-retrieval";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Clock,
@@ -297,7 +298,7 @@ export function DiscoveryView({
       if (--pending === 0 && generation === searchGeneration.current)
         onStateChange(current => ({ ...current, searching: false }));
     };
-    void library.searchCatalog(trimmed, 20).then(results => {
+    void searchRetrieval(trimmed, 20, library.searchCatalog).then(results => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, results }));
     }, error => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, error: String(error) }));

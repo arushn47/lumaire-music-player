@@ -1,3 +1,4 @@
+import { searchRetrieval } from "../../domain/search-retrieval";
 import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
 import { library, type CatalogTrack, type CatalogArtist, type CatalogAlbum } from "../../adapters/native";
@@ -94,7 +95,7 @@ export function TopBarSearch({
       const update = (patch: Partial<NonNullable<typeof matches>>) => {
         if (!cancelled) setMatches(current => ({ query: trimmed, tracks: [], artists: [], albums: [], error: "", warning: "", ...(current?.query === trimmed ? current : {}), ...patch }));
       };
-      void library.searchCatalog(trimmed, 5).then(tracks => update({ tracks: tracks.slice(0, 5) }), () => update({ warning: "Some suggestions could not be loaded." }));
+      void searchRetrieval(trimmed, 5, library.searchCatalog).then(tracks => update({ tracks: tracks.slice(0, 5) }), () => update({ warning: "Some suggestions could not be loaded." }));
       void library.searchCatalogEntities(trimmed).then(entities => update({ artists: entities.artists.slice(0, 3), albums: entities.albums.slice(0, 3), warning: entities.warning || "" }), () => update({ warning: "Some suggestions could not be loaded." }));
     }, 300);
     return () => { cancelled = true; window.clearTimeout(timer); };

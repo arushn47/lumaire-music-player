@@ -1,3 +1,7 @@
+## Search Phase 2 incremental checkpoint
+
+Phase 1 checkpoint `6a27686` created after 14 native / 12 frontend tests and build. Continued immediately with interactive-only sourced aliases and native/Roman mixed-script recovery, at most one sparse-result fallback. 60 focused frontend tests and production build passed. Existing native adapter, playback and Gemini test environment unchanged. `docs/search-checkpoints.md` lists independent validation commands, inherited WIP scope and unimplemented phase targets; manual Windows/Android and live benchmarks pending.
+
 ## Search Phase 1 implementation checkpoint
 
 Incremental lexical/responsiveness slice implemented; see `docs/search-checkpoints.md` for scope, regression commands and remaining native-provider streaming gate. Gemini test environment untouched.
