@@ -235,6 +235,7 @@ export function DiscoveryView({
   const rootRef = useRef<HTMLDivElement>(null);
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchGeneration = useRef(0);
+  const searchCancellation = useRef<AbortController | null>(null);
   const [recentSearches, setRecentSearches] = useState(() => discoveryPreferences().searches);
   const [searchFocused, setSearchFocused] = useState(false);
   const [discoverRevision, setDiscoverRevision] = useState(0);
@@ -256,6 +257,7 @@ export function DiscoveryView({
   }, [historyEnabled]);
   useEffect(() => () => {
     searchGeneration.current++;
+    searchCancellation.current?.abort();
     onStateChange(current => ({ ...current, searching: false }));
   }, []);
   const { query, results, artists, albums, searchedQuery, entityError, searching, error, filter } = state;
@@ -279,6 +281,9 @@ export function DiscoveryView({
     if (!trimmed) return;
     if (historyEnabled) setRecentSearches(rememberDiscoverySearch(trimmed));
     rootRef.current?.closest("main")?.scrollTo({ top: 0 });
+    searchCancellation.current?.abort();
+    const controller = new AbortController();
+    searchCancellation.current = controller;
     const generation = ++searchGeneration.current;
     onStateChange((current) => ({
       ...current,
@@ -293,18 +298,22 @@ export function DiscoveryView({
       error: "",
       filter: "songs",
     }));
+    let expandedArtists: CatalogArtist[] = [];
     let pending = 2;
     const finish = () => {
       if (--pending === 0 && generation === searchGeneration.current)
         onStateChange(current => ({ ...current, searching: false }));
     };
-    void searchRetrieval(trimmed, 20, library.searchCatalog).then(results => {
+    void searchRetrieval(trimmed, 20, library.searchCatalog, { knownTracks: savedTracks, signal: controller.signal, onExpandedArtists: artists => {
+      expandedArtists = artists;
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: [...new Map([...current.artists, ...artists].map(artist => [artist.id, artist])).values()] }));
+    } }).then(results => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, results }));
     }, error => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, error: String(error) }));
     }).finally(finish);
     void library.searchCatalogEntities(trimmed).then(entities => {
-      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: entities.artists, albums: entities.albums, entityError: entities.warning || "" }));
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: [...new Map([...expandedArtists, ...entities.artists].map(artist => [artist.id, artist])).values()], albums: entities.albums, entityError: entities.warning || "" }));
     }, error => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, entityError: String(error) }));
     }).finally(finish);
@@ -318,7 +327,7 @@ export function DiscoveryView({
     }
     onStateChange(current => ({ ...current, searching: true }));
     const timer = window.setTimeout(() => handleSearch(trimmed), 350);
-    return () => { window.clearTimeout(timer); searchGeneration.current++; };
+    return () => { window.clearTimeout(timer); searchGeneration.current++; searchCancellation.current?.abort(); };
   }, [query]);
 
   return (

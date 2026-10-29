@@ -1,3 +1,9 @@
+## Search Phase 2 — sourced multilingual retrieval (29 October 2026)
+
+- Extended interactive search from `08f5357`: alias phrases inside mixed queries, source/artist-ID-scoped recovery, saved-title Roman/native forms, independent Indic script runs and search-only Tamil correction. At most one extra query; recovered candidates must pass full expanded terms and stable identities. Homonyms/script collisions require evidence, not guessed equivalence. Existing providers, caches, playback and lyrics unchanged.
+- Identity-backed artist results merge into the existing category by ID without another entity request. Query generations/AbortSignals stop obsolete recovery. 89 focused tests across six files plus production build passed; native/manual and live recall/latency remain pending for Gemini.
+- `docs/search-phase2-multilingual.md` records commands, review scope, deterministic coverage and limits. Original search checkout only; parallel-lyrics branch and Gemini environment untouched. Other WIP is preserved unstaged.
+
 ## Search Phase 2 incremental checkpoint
 
 Phase 1 checkpoint `6a27686` created after 14 native / 12 frontend tests and build. Continued immediately with interactive-only sourced aliases and native/Roman mixed-script recovery, at most one sparse-result fallback. 60 focused frontend tests and production build passed. Existing native adapter, playback and Gemini test environment unchanged. `docs/search-checkpoints.md` lists independent validation commands, inherited WIP scope and unimplemented phase targets; manual Windows/Android and live benchmarks pending.

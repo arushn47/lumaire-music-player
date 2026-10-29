@@ -91,14 +91,19 @@ export function TopBarSearch({
   useEffect(() => {
     if (!expanded) return;
     let cancelled = false;
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
+      let expandedArtists: CatalogArtist[] = [];
       const update = (patch: Partial<NonNullable<typeof matches>>) => {
         if (!cancelled) setMatches(current => ({ query: trimmed, tracks: [], artists: [], albums: [], error: "", warning: "", ...(current?.query === trimmed ? current : {}), ...patch }));
       };
-      void searchRetrieval(trimmed, 5, library.searchCatalog).then(tracks => update({ tracks: tracks.slice(0, 5) }), () => update({ warning: "Some suggestions could not be loaded." }));
-      void library.searchCatalogEntities(trimmed).then(entities => update({ artists: entities.artists.slice(0, 3), albums: entities.albums.slice(0, 3), warning: entities.warning || "" }), () => update({ warning: "Some suggestions could not be loaded." }));
+      void searchRetrieval(trimmed, 5, library.searchCatalog, { knownTracks: savedTracks, signal: controller.signal, onExpandedArtists: artists => {
+        expandedArtists = artists;
+        if (!cancelled) setMatches(current => ({ query: trimmed, tracks: [], albums: [], error: "", warning: "", ...(current?.query === trimmed ? current : {}), artists: [...new Map([...artists, ...(current?.query === trimmed ? current.artists : [])].map(artist => [artist.id, artist])).values()].slice(0, 3) }));
+      } }).then(tracks => update({ tracks: tracks.slice(0, 5) }), () => update({ warning: "Some suggestions could not be loaded." }));
+      void library.searchCatalogEntities(trimmed).then(entities => update({ artists: [...new Map([...expandedArtists, ...entities.artists].map(artist => [artist.id, artist])).values()].slice(0, 3), albums: entities.albums.slice(0, 3), warning: entities.warning || "" }), () => update({ warning: "Some suggestions could not be loaded." }));
     }, 300);
-    return () => { cancelled = true; window.clearTimeout(timer); };
+    return () => { cancelled = true; controller.abort(); window.clearTimeout(timer); };
   }, [trimmed, expanded]);
 
   useEffect(() => {
