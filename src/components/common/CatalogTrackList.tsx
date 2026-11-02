@@ -1,4 +1,4 @@
-import { Loader2, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import type { JSX } from "react";
 import type { CatalogTrack } from "../../adapters/native";
 import { ArtistLinks } from "./ArtistLinks";
@@ -30,7 +30,15 @@ export function CatalogTrackList({ tracks, busy, downloads, onSaveDiscovery, onN
           const disabled = busy;
           const seconds = Number.isFinite(track.duration) ? Math.max(0, Math.floor(track.duration)) : 0;
           return (
-            <div className="track-row" role="listitem" key={track.id}>
+            <div
+              className="track-row"
+              role="listitem"
+              key={track.id}
+              onClick={(e) => {
+                if (disabled || (e.target as HTMLElement).closest("button, a, summary, details, input, .track-actions, .menu-popover")) return;
+                onSaveDiscovery(track, "play");
+              }}
+            >
               <button className="track-play" aria-label={`Play ${track.title}`} disabled={disabled} onClick={() => onSaveDiscovery(track, "play")}>
                 {<>
                   <span className="track-index">{String(index + 1).padStart(2, "0")}</span>
@@ -38,12 +46,19 @@ export function CatalogTrackList({ tracks, busy, downloads, onSaveDiscovery, onN
                 </>}
               </button>
               <div className="track-meta">
-                <Artwork url={track.artworkUrl} />
+                <div className="track-cover-container">
+                  <Artwork url={track.artworkUrl} />
+                  {downloading && (
+                    <div className="track-cover-download-overlay" title="Downloading…" role="img" aria-label="Downloading">
+                      <div className="track-cover-spinner spin" />
+                    </div>
+                  )}
+                </div>
                 <span className="track-meta-text">
                   <button className="track-title-button" disabled={disabled} aria-label={`Listen to ${track.title}`} onClick={() => onSaveDiscovery(track, "play")}>
                     <strong dir="auto" title={track.title}>{track.title}</strong>
                   </button>
-                  <small dir="auto">{downloading && <Loader2 size={12} className="spin" aria-label="Downloading" />}<DownloadedBadge track={saved} /><ArtistLinks artists={track.artists} artistString={track.artist} onNavigateArtist={onNavigateArtist} /></small>
+                  <small dir="auto"><DownloadedBadge track={saved} /><ArtistLinks artists={track.artists} artistString={track.artist} catalogId={track.id} onNavigateArtist={onNavigateArtist} /></small>
                 </span>
               </div>
               {onNavigateAlbum && <span className="album ellipsis" title={track.album}>

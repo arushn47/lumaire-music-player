@@ -4,7 +4,7 @@ import { canonicalArtistCredit } from "./catalog-links";
 
 const words = (text: string): string => text.normalize("NFKD").replace(/(\p{Script=Latin})\p{M}+/gu, "$1").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, " ").trim().replace(/\b([a-z]) (?=[a-z](?: |$))/g, "$1");
 const identity = (text: string): string => words(text).replaceAll(" ", "");
-const versions = /\b(cover|remix|live|slowed|sped|nightcore|instrumental|karaoke|acoustic|reprise|remaster(?:ed)?|sped up)\b/gi;
+const versions = /\b(cover|remix|live|performance|mashup|rework|slowed|sped|nightcore|instrumental|karaoke|acoustic|reprise|remaster(?:ed)?|sped up)\b/gi;
 
 export function sourceTitle(text: string): string {
   return cleanVideoTitle(text.replace(/\s+(?:Tamil|Telugu|Hindi|Malayalam|Kannada|Bengali|Punjabi)\s+lyric(?:s|al)?(?=\s*(?:[|｜]|$))/gi, ""))
@@ -28,6 +28,7 @@ export function sourceCoreTitle(text: string): string {
 }
 
 export function sourceCredits(track: CatalogTrack): string[] {
+  if (!track) return [];
   return [...new Set([...(track.artists || []).map(a => a.name), track.artist]
     .flatMap(text => canonicalArtistCredit(text).split(/\s*[,;&]\s*|\s+(?:and|feat\.?|ft\.?|featuring|x)\s+/i))
     .map(text => text.trim()).filter(text => text && !/^unknown(?: artist)?$/i.test(text)))];
@@ -97,6 +98,17 @@ export async function matchSource(catalog: CatalogTrack, candidate: YtdlpSearchR
   if (!titleMatch && alternateTitles.length === 2 && alternateTitles.every(part => part.trim() && segments.some(segment => closeTitle(part, segment)))) titleMatch = true;
   if (!title || !titleMatch) return reject("title");
   const credits = sourceCredits(catalog);
+  // Explicit collaboration credits must not introduce another performer into the requested recording.
+  const creditSegments=pieces.filter((_,index)=>
+    (index>0&&closeTitle(title,sourceTitle(pieces.slice(0,index).join('-')))) ||
+    (index<pieces.length-1&&closeTitle(title,sourceTitle(pieces.slice(index+1).join('-')))));
+  for (const segment of creditSegments) {
+    const collaborators=segment.split(/\s+[x×&]\s+|\s+(?:feat\.?|ft\.?|featuring)\s+/i).map(value=>cleanVideoTitle(value).trim()).filter(Boolean);
+    if (collaborators.length>1) {
+      const allowed=new Set((await Promise.all(credits.map(async credit=>[identity(canonicalArtistCredit(credit)),identity(await searchRoman(credit))]))).flat());
+      if (collaborators.some(credit=>!allowed.has(identity(canonicalArtistCredit(credit))))) return reject('additional-performer');
+    }
+  }
   const evidence = [candidate.artist || "", candidate.channel || "", candidate.title, ...queries.map(q => q.artist)];
   let artistMatch = false;
   for (const credit of credits) {

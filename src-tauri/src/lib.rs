@@ -14,14 +14,18 @@ use std::{
 use tauri::{AppHandle, Manager, State};
 use uuid::Uuid;
 
-mod android;
+pub(crate) mod android;
+#[cfg(target_os = "android")]
+pub(crate) mod android_background;
+#[cfg(target_os = "android")]
+pub(crate) mod android_queue_state;
 mod audio_container;
 #[cfg(any(windows, test))]
 mod offline_repair;
 mod artwork_cache;
 mod audio_analysis;
 mod components;
-mod catalog;
+pub(crate) mod catalog;
 mod catalog_search;
 mod brainz_catalog;
 mod music_metadata;
@@ -38,21 +42,34 @@ mod downloads;
 mod entity_artwork;
 mod itunes_metadata;
 mod lastfm_metadata;
-mod listening;
+pub(crate) mod listening;
 mod lyric_identity;
 mod lyrics_provider;
 mod private_settings;
 mod provider_http;
 mod translation;
 mod keyless_translation;
+pub(crate) mod recording_metadata;
 mod lyric_languages;
 mod ytdlp;
 
-struct Store(Mutex<Connection>);
+pub(crate) struct Store(pub(crate) Mutex<Connection>);
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct Track {
+pub(crate) struct VerifiedSource {
+    #[serde(default)]
+    pub(crate) user_selected: bool,
+    pub(crate) source_id: String,
+    pub(crate) source_provider: String,
+    pub(crate) title: String,
+    pub(crate) artist: Option<String>,
+    pub(crate) duration: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Track {
     id: String,
     title: String,
     artist: String,
@@ -69,11 +86,13 @@ struct Track {
     offline: bool,
     #[serde(default)]
     metadata_source_id: Option<String>,
+    #[serde(default)]
+    pub recording_metadata: Option<recording_metadata::RecordingMetadata>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct RemoteSource {
+pub(crate) struct RemoteSource {
     provider_id: String,
     source_id: String,
     page_url: String,
@@ -196,14 +215,26 @@ fn initialize(db: &mut Connection) -> Result<()> {
     tx.execute_batch("CREATE TABLE IF NOT EXISTS tracks (id TEXT PRIMARY KEY, path TEXT UNIQUE, metadata TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK(id=1), data TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS entity_artwork (identity TEXT PRIMARY KEY, metadata TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS verified_sources (catalog_id TEXT PRIMARY KEY, source_id TEXT NOT NULL, source_provider TEXT NOT NULL, title TEXT NOT NULL, artist TEXT, duration REAL, verified_at INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS download_queue (track_id TEXT PRIMARY KEY, collection_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, added_at INTEGER NOT NULL, track_data TEXT);
       ").map_err(err)?;
     listening::initialize(&tx)?;
+    let has_user_source = tx.prepare("PRAGMA table_info(verified_sources)").map_err(err)?
+        .query_map([], |row| row.get::<_, String>(1)).map_err(err)?
+        .collect::<std::result::Result<Vec<_>, _>>().map_err(err)?.iter().any(|name| name == "user_selected");
+    if !has_user_source { tx.execute("ALTER TABLE verified_sources ADD COLUMN user_selected INTEGER NOT NULL DEFAULT 0", []).map_err(err)?; }
+    let has_download_track_data = tx.prepare("PRAGMA table_info(download_queue)").map_err(err)?
+        .query_map([], |row| row.get::<_, String>(1)).map_err(err)?
+        .collect::<std::result::Result<Vec<_>, _>>().map_err(err)?.iter().any(|name| name == "track_data");
+    if !has_download_track_data { tx.execute("ALTER TABLE download_queue ADD COLUMN track_data TEXT", []).map_err(err)?; }
     device_sync::initialize(&tx)?;
+    keyless_translation::initialize(&tx)?;
+    tx.execute("UPDATE download_queue SET status='pending' WHERE status='downloading'", []).map_err(err)?;
     tx.execute_batch("PRAGMA user_version=2;").map_err(err)?;
     tx.commit().map_err(err)
 }
 
-fn snapshot(db: &Connection) -> Result<Snapshot> {
+pub(crate) fn snapshot(db: &Connection) -> Result<Snapshot> {
     let mut stmt = db
         .prepare("SELECT metadata,path FROM tracks ORDER BY rowid")
         .map_err(err)?;
@@ -288,6 +319,7 @@ fn inspect(path: &Path, id: String) -> Track {
         artwork_url: None,
         offline: false,
         metadata_source_id: None,
+        recording_metadata: None,
     };
     if let Ok(file) = Probe::open(path).and_then(|p| p.read()) {
         track.duration = file.properties().duration().as_secs_f64();
@@ -504,8 +536,7 @@ async fn search_commons_audio(query: String) -> Result<Vec<RemoteTrack>> {
     Ok(results)
 }
 
-#[tauri::command]
-async fn resolve_commons_audio(source_id: String) -> Result<ResolvedMedia> {
+pub(crate) async fn resolve_commons_audio_inner(source_id: String) -> Result<ResolvedMedia> {
     let page_id: i64 = source_id
         .parse()
         .map_err(|_| "This online track identity is invalid.".to_string())?;
@@ -561,6 +592,11 @@ async fn resolve_commons_audio(source_id: String) -> Result<ResolvedMedia> {
         license_url: plain_metadata(&info["extmetadata"]["LicenseUrl"]),
         attribution: plain_metadata(&info["extmetadata"]["Artist"]),
     })
+}
+
+#[tauri::command]
+async fn resolve_commons_audio(source_id: String) -> Result<ResolvedMedia> {
+    resolve_commons_audio_inner(source_id).await
 }
 fn is_audio(path: &Path) -> bool {
     path.extension().and_then(|s| s.to_str()).is_some_and(|s| {
@@ -792,8 +828,7 @@ async fn import_audio(app: AppHandle, folder: bool) -> Result<Imported> {
     })
     .await
 }
-#[tauri::command]
-async fn media_path(app: AppHandle, id: String) -> Result<String> {
+pub(crate) async fn media_path_inner(app: AppHandle, id: String) -> Result<String> {
     work(app, move |app, db| {
         let stored: Option<String> = db
             .query_row("SELECT path FROM tracks WHERE id=?1", [id], |r| r.get(0))
@@ -813,6 +848,11 @@ async fn media_path(app: AppHandle, id: String) -> Result<String> {
     })
     .await
 }
+
+#[tauri::command]
+async fn media_path(app: AppHandle, id: String) -> Result<String> {
+    media_path_inner(app, id).await
+}
 #[tauri::command]
 #[cfg(not(target_os = "android"))]
 async fn relink_audio(app: AppHandle, id: String) -> Result<Option<Track>> {
@@ -829,18 +869,73 @@ async fn relink_audio(app: AppHandle, id: String) -> Result<Option<Track>> {
     }).await
 }
 
+pub(crate) fn write_session_transaction(db: &Connection, session: &serde_json::Value) -> Result<()> {
+    validate_session(session)?;
+    let json = serde_json::to_string(session).map_err(err)?;
+    if json.len() > 20 * 1024 * 1024 {
+        return Err("Library text is too large to save (20 MB limit).".into());
+    }
+    device_sync::persist_session_cells(db, session)?;
+    db.execute(
+        "INSERT INTO app_state(id,data) VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET data=excluded.data",
+        [json],
+    )
+    .map_err(err)?;
+    Ok(())
+}
+
+pub(crate) fn write_session(db: &mut Connection, session: &serde_json::Value) -> Result<()> {
+    let tx = db.transaction().map_err(err)?;
+    write_session_transaction(&tx, session)?;
+    tx.commit().map_err(err)
+}
+
+pub(crate) async fn get_verified_source_inner(app: AppHandle, catalog_id: String) -> Result<Option<VerifiedSource>> {
+    work(app, move |_, db| {
+        db.query_row(
+            "SELECT source_id, source_provider, title, artist, duration, user_selected FROM verified_sources WHERE catalog_id=?1",
+            [&catalog_id],
+            |row| Ok(VerifiedSource {
+                source_id: row.get(0)?, source_provider: row.get(1)?, title: row.get(2)?,
+                artist: row.get(3)?, duration: row.get(4)?, user_selected: row.get(5)?,
+            }),
+        ).optional().map_err(err)
+    }).await
+}
+
 #[tauri::command]
-async fn save_session(app: AppHandle, session: serde_json::Value) -> Result<()> {
-    work(app,move |_,db|{
-        validate_session(&session)?;
-        let json=serde_json::to_string(&session).map_err(err)?;
-        if json.len()>20*1024*1024 {return Err("Library text is too large to save (20 MB limit).".into());}
-        let tx = db.transaction().map_err(err)?;
-        device_sync::persist_session_cells(&tx, &session)?;
-        tx.execute("INSERT INTO app_state(id,data) VALUES(1,?1) ON CONFLICT(id) DO UPDATE SET data=excluded.data",[json]).map_err(err)?;
-        tx.commit().map_err(err)?;
+async fn get_verified_source(app: AppHandle, catalog_id: String) -> Result<Option<VerifiedSource>> {
+    get_verified_source_inner(app, catalog_id).await
+}
+
+pub(crate) async fn set_verified_source_inner(app: AppHandle, catalog_id: String, source: VerifiedSource) -> Result<()> {
+    if catalog_id.is_empty() || catalog_id.len() > 512 || source.source_id.is_empty() || source.source_id.len() > 512
+        || source.source_provider.len() > 64 || source.title.len() > 2048
+        || source.artist.as_ref().is_some_and(|value| value.len() > 2048)
+        || source.duration.is_some_and(|value| !value.is_finite() || value < 0.0 || value > 86_400.0)
+    { return Err("Invalid verified source.".into()); }
+    work(app, move |_, db| {
+        db.execute(
+            "INSERT INTO verified_sources(catalog_id,source_id,source_provider,title,artist,duration,verified_at,user_selected) VALUES(?1,?2,?3,?4,?5,?6,unixepoch(),?7) ON CONFLICT(catalog_id) DO UPDATE SET source_id=excluded.source_id,source_provider=excluded.source_provider,title=excluded.title,artist=excluded.artist,duration=excluded.duration,verified_at=excluded.verified_at,user_selected=excluded.user_selected",
+            params![catalog_id, source.source_id, source.source_provider, source.title, source.artist, source.duration, source.user_selected],
+        ).map_err(err)?;
         Ok(())
     }).await
+}
+
+#[tauri::command]
+async fn set_verified_source(app: AppHandle, catalog_id: String, source: VerifiedSource) -> Result<()> {
+    set_verified_source_inner(app, catalog_id, source).await
+}
+
+#[tauri::command]
+async fn delete_verified_source(app: AppHandle, catalog_id: String) -> Result<()> {
+    work(app, move |_, db| { db.execute("DELETE FROM verified_sources WHERE catalog_id=?1", [catalog_id]).map_err(err)?; Ok(()) }).await
+}
+
+#[tauri::command]
+async fn save_session(app: AppHandle, session: serde_json::Value) -> Result<()> {
+    work(app, move |_, db| write_session(db, &session)).await
 }
 
 fn remove_track_data(
@@ -928,7 +1023,7 @@ fn remove_track_data(
 async fn remove_track(app: AppHandle, id: String, session: serde_json::Value) -> Result<Snapshot> {
     work(app, move |_, db| remove_track_data(db, &id, session)).await
 }
-fn validate_session(s: &serde_json::Value) -> Result<()> {
+pub(crate) fn validate_session(s: &serde_json::Value) -> Result<()> {
     if !s.is_object()
         || !s["queue"].is_array()
         || !s["playlists"].is_array()
@@ -1425,6 +1520,8 @@ pub fn run() {
             if let Some(window) = app.get_webview_window("main") { if let Err(error) = taskbar::install(&window) { log::warn!("Taskbar toolbar: {error}"); } }
             app.manage(Store(Mutex::new(db)));
             app.manage(nearby::Nearby::default());
+            #[cfg(target_os = "android")]
+            android_background::install(app.handle().clone());
             #[cfg(windows)]
             {
                 let handle = app.handle().clone();
@@ -1456,10 +1553,20 @@ pub fn run() {
             nearby::nearby_stop,
             nearby::nearby_publish,
             nearby::nearby_fetch,
+            nearby::nearby_rediscover,
             nearby::nearby_exchange,
             device_sync::get_sync_state,
             device_sync::set_history_sync,
             device_sync::set_favorites_sync,
+            device_sync::save_playback_checkpoint,
+            device_sync::get_playback_checkpoints,
+            device_sync::delete_playback_checkpoint,
+            device_sync::get_sync_peer,
+            get_verified_source,
+            set_verified_source,
+            delete_verified_source,
+            android::android_background_queue,
+            android::android_background_start,
             load_library,
             save_online_track,
             import_audio,
@@ -1477,6 +1584,10 @@ pub fn run() {
             downloads::download_track,
             downloads::cancel_download,
             downloads::delete_download,
+            downloads::get_download_queue,
+            downloads::save_download_queue,
+            downloads::update_download_queue_status,
+            downloads::clear_download_queue,
             translation::translate_lyrics,
             translation::process_lyrics,
             keyless_translation::process_keyless_lyrics,
@@ -1488,6 +1599,9 @@ pub fn run() {
             fetch_lyrics,
             lookup_metadata,
             catalog::search_catalog,
+            catalog::search_catalog_records,
+            catalog::search_mood_collection,
+            catalog::search_genre_collection,
             catalog::search_catalog_entities,
             catalog::lookup_catalog,
             catalog::recommend_catalog,
@@ -1513,8 +1627,16 @@ pub fn run() {
             android::android_source,
             android::android_demo_track
         ])
-        .run(context)
-        .expect("Lumaire could not start");
+        .build(context)
+        .expect("Lumaire could not start")
+        .run(|_app, _event| {
+            #[cfg(target_os = "android")]
+            if let tauri::RunEvent::ExitRequested { api, code: None, .. } = _event {
+                if android_background::keep_process_alive() {
+                    api.prevent_exit();
+                }
+            }
+        });
 }
 
 #[cfg(test)]
@@ -1810,5 +1932,25 @@ mod tests {
             clean_artist_for_lyrics("unknown artist", "KR$NA - Sensitive (Official Video)"),
             ("KR$NA".to_string(), "Sensitive".to_string())
         );
+    }
+
+    #[test]
+    fn verified_source_upsert_and_delete_preserve_user_choice() {
+        let mut db = Connection::open_in_memory().unwrap();
+        initialize(&mut db).unwrap();
+        let source = VerifiedSource {
+            user_selected: true,
+            source_id: "abcdefghijk".into(),
+            source_provider: "youtube".into(),
+            title: "Song".into(),
+            artist: Some("Artist".into()),
+            duration: Some(180.0),
+        };
+        db.execute("INSERT INTO verified_sources(catalog_id,source_id,source_provider,title,artist,duration,verified_at,user_selected) VALUES(?1,?2,?3,?4,?5,?6,unixepoch(),?7)", params!["catalog:1", source.source_id, source.source_provider, source.title, source.artist, source.duration, source.user_selected]).unwrap();
+        let selected: bool = db.query_row("SELECT user_selected FROM verified_sources WHERE catalog_id='catalog:1'", [], |row| row.get(0)).unwrap();
+        assert!(selected);
+        db.execute("DELETE FROM verified_sources WHERE catalog_id='catalog:1'", []).unwrap();
+        let exists: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM verified_sources WHERE catalog_id='catalog:1')", [], |row| row.get(0)).unwrap();
+        assert!(!exists);
     }
 }

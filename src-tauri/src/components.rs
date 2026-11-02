@@ -6,12 +6,13 @@ use std::time::{Duration, Instant};
 
 const SET: &str = "youtube-2026.08.19-quickjs-0.17.0";
 const MAX_BYTES: usize = 64 * 1024 * 1024;
-struct Component {
+#[derive(Clone, Copy)]
+struct Component<'a> {
     name: &'static str,
-    url: &'static str,
-    sha256: &'static str,
+    url: &'a str,
+    sha256: &'a str,
 }
-const COMPONENTS: [Component; 2] = [
+const COMPONENTS: [Component<'static>; 2] = [
     Component {
         name: "yt-dlp.exe",
         url: "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
@@ -26,6 +27,45 @@ const COMPONENTS: [Component; 2] = [
 ];
 static INSTALLING: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 static CANCELLED: AtomicBool = AtomicBool::new(false);
+static AUTO_CHECK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+fn release_engine(value: &serde_json::Value) -> Result<(String, String), String> {
+    if value["draft"] != false || value["prerelease"] != false { return Err("Only stable engine releases are supported.".into()); }
+    let asset = value["assets"].as_array().and_then(|assets| assets.iter().find(|a| a["name"] == "yt-dlp.exe"))
+        .ok_or("Official release has no Windows engine.")?;
+    let url = asset["browser_download_url"].as_str().unwrap_or("");
+    let digest = asset["digest"].as_str().unwrap_or("").strip_prefix("sha256:").unwrap_or("");
+    if !url.starts_with("https://github.com/yt-dlp/yt-dlp/releases/download/") || !url.ends_with("/yt-dlp.exe")
+        || digest.len()!=64 || !digest.bytes().all(|b| b.is_ascii_hexdigit())
+        || asset["size"].as_u64().is_none_or(|size| size == 0 || size > MAX_BYTES as u64) {
+        return Err("Invalid official engine release metadata.".into());
+    }
+    Ok((url.into(), digest.to_ascii_lowercase()))
+}
+
+async fn latest_engine(client: &reqwest::Client) -> Result<(String, String), String> {
+    let mut response = client.get("https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest")
+        .timeout(Duration::from_secs(15)).send().await.map_err(|e| e.to_string())?
+        .error_for_status().map_err(|e| e.to_string())?;
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|e| e.to_string())? {
+        if bytes.len()+chunk.len()>1_000_000 { return Err("Engine release metadata is too large.".into()); }
+        bytes.extend_from_slice(&chunk);
+    }
+    release_engine(&serde_json::from_slice(&bytes).map_err(|e| e.to_string())?)
+}
+
+pub async fn auto_update() {
+    if !cfg!(all(windows, target_arch="x86_64")) { return; }
+    let Ok(_guard) = AUTO_CHECK.try_lock() else { return; };
+    let Ok(root) = root() else { return; };
+    let marker = root.join("engine-update-check");
+    if std::fs::metadata(&marker).and_then(|m| m.modified()).ok()
+        .and_then(|time| time.elapsed().ok()).is_some_and(|age| age < Duration::from_secs(86400)) { return; }
+    if std::fs::create_dir_all(&root).is_err() { return; }
+    let _ = std::fs::write(marker, b"");
+    if let Err(error) = install_engine(|_| {}).await { log::warn!("Automatic engine update deferred: {error}"); }
+}
 
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -97,6 +137,7 @@ fn verify(bytes: &[u8], expected: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(test)]
 fn already_installed(folder: &Path) -> bool {
     COMPONENTS.iter().all(|component| {
         let path = folder.join(component.name);
@@ -111,7 +152,7 @@ fn retryable_status(status: reqwest::StatusCode) -> bool {
 
 async fn download(
     client: &reqwest::Client,
-    component: &Component,
+    component: &Component<'_>,
     report: &impl Fn(InstallProgress),
 ) -> Result<Vec<u8>, String> {
     let mut last_error = String::new();
@@ -147,7 +188,7 @@ async fn download(
 
 async fn download_once(
     client: &reqwest::Client,
-    component: &Component,
+    component: &Component<'_>,
     attempt: u8,
     report: &impl Fn(InstallProgress),
 ) -> Result<Vec<u8>, (String, bool)> {
@@ -270,6 +311,10 @@ fn promote(staging: &Path, destination: &Path, previous: &Path) -> Result<(), St
 pub async fn install_youtube_engine(
     on_progress: tauri::ipc::Channel<InstallProgress>,
 ) -> Result<(), String> {
+    install_engine(|progress| { let _ = on_progress.send(progress); }).await
+}
+
+async fn install_engine(report: impl Fn(InstallProgress)) -> Result<(), String> {
     if !cfg!(all(windows, target_arch = "x86_64")) {
         return Err(
             "This component installer is for 64-bit Windows. Android includes its engine.".into(),
@@ -279,11 +324,13 @@ pub async fn install_youtube_engine(
         .try_lock()
         .map_err(|_| "Component installation is already running.")?;
     CANCELLED.store(false, Ordering::Relaxed);
-    let report = |progress| {
-        let _ = on_progress.send(progress);
-    };
     let root = root()?;
     let destination = root.join(SET);
+    let client = reqwest::Client::builder().https_only(true)
+        .user_agent("Lumaire component-installer").connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(120)).build().map_err(|e| e.to_string())?;
+    let release = latest_engine(&client).await?;
+    let components = [Component { name: "yt-dlp.exe", url: &release.0, sha256: &release.1 }, COMPONENTS[1]];
     report(InstallProgress {
         stage: "verifying",
         component: "installed components",
@@ -291,10 +338,7 @@ pub async fn install_youtube_engine(
         total: None,
         attempt: 1,
     });
-    let existing = destination.clone();
-    if tauri::async_runtime::spawn_blocking(move || already_installed(&existing))
-        .await
-        .map_err(|e| e.to_string())?
+    if components.iter().all(|c| std::fs::read(destination.join(c.name)).is_ok_and(|b| verify(&b,c.sha256).is_ok()))
     {
         report(InstallProgress {
             stage: "testing",
@@ -307,17 +351,10 @@ pub async fn install_youtube_engine(
         cancelled()?;
         return Ok(());
     }
-    let client = reqwest::Client::builder()
-        .https_only(true)
-        .user_agent("Lumaire component-installer")
-        .connect_timeout(Duration::from_secs(20))
-        .timeout(Duration::from_secs(600))
-        .build()
-        .map_err(|e| e.to_string())?;
     let staging = root.join(format!("staging-{}", uuid::Uuid::new_v4()));
     std::fs::create_dir_all(&staging).map_err(|e| format!("Could not create Lumaire's component folder. Check disk space and folder permissions. Details: {e}"))?;
     let result = async {
-        for component in &COMPONENTS {
+        for component in &components {
             let bytes = download(&client, component, &report).await?;
             cancelled()?;
             std::fs::write(staging.join(component.name), bytes).map_err(|e| {
@@ -367,6 +404,25 @@ pub fn cancel_youtube_engine_install() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "live official download; requires an isolated LUMAIRE_DATA_DIR"]
+    fn official_engine_update_smoke() {
+        assert!(std::env::var_os("LUMAIRE_DATA_DIR").is_some());
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            install_engine(|_| {}).await.unwrap();
+            test_set(root().unwrap().join(SET)).await.unwrap();
+        });
+    }
+    #[test]
+    fn engine_release_requires_official_stable_asset_and_checksum() {
+        let valid = serde_json::json!({"draft":false,"prerelease":false,"assets":[{"name":"yt-dlp.exe","size":100,"browser_download_url":"https://github.com/yt-dlp/yt-dlp/releases/download/2026.10.26/yt-dlp.exe","digest":format!("sha256:{}","a".repeat(64))}]});
+        assert!(release_engine(&valid).is_ok());
+        for (field, value) in [("browser_download_url",serde_json::json!("https://example.com/yt-dlp.exe")),("digest",serde_json::Value::Null),("size",serde_json::json!(MAX_BYTES+1))] {
+            let mut invalid=valid.clone();invalid["assets"][0][field]=value;
+            assert!(release_engine(&invalid).is_err());
+        }
+        let mut preview=valid;preview["prerelease"]=serde_json::json!(true);assert!(release_engine(&preview).is_err());
+    }
 
     #[test]
     fn rejects_tampering_and_non_executables() {

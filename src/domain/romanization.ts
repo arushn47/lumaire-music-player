@@ -20,31 +20,28 @@ const runs =
 // Sanscript for the wider script coverage and conjunct/nukta handling.
 function readableRoman(text: string, script?: string): string {
   const spelling: Record<string, string> = {
-    ā: "aa",
-    ī: "ee",
-    ū: "oo",
-    ē: "ee",
-    ō: "oo",
-    ṛ: "ri",
-    ṝ: "ree",
-    ḷ: "l",
-    ḹ: "ll",
-    ḻ: "zh",
-    ṅ: "ng",
-    ñ: "ny",
-    ṇ: "n",
-    ṭ: "t",
-    ḍ: "d",
-    ś: "sh",
-    ṣ: "sh",
-    ṃ: "m",
-    ṁ: "m",
-    ḥ: "h",
-    ẓ: "z",
+    ā: "aa", ī: "ee", ū: "oo", ē: "ee", ō: "oo",
+    ṛ: "ri", ṝ: "ree", ḷ: "l", ḹ: "ll", ḻ: "zh",
+    ṅ: "ng", ñ: "ny", ṇ: "n", ṭ: "t", ḍ: "d", ṟ: "r", ṙ: "r",
+    ś: "sh", ṣ: "sh", ṃ: "m", ṁ: "m", ḥ: "h", ẓ: "z", "~": "n",
     c: "ch",
-    ...(script === "tamil" ? { t: "th" } : {}),
+    ...(script === "tamil" ? { t: "th", ṉ: "n", ṟ: "r" } : {}),
+    ...(script === "malayalam" ? { ñ: "nj", ṟ: "r", t: "th" } : {}),
   };
-  return Array.from(text, (letter) => spelling[letter] ?? letter).join("");
+  if (script === "gurmukhi") spelling["ṃ"] = "n";
+  if (script === "bengali") spelling["ṃ"] = spelling["ṁ"] = "n";
+
+  if (script === "tamil") spelling["ṉ"] = "n";
+  const letters = Array.from(text.normalize("NFD"));
+  const normalized = letters.map((letter, index) => {
+    if (/\p{M}/u.test(letter)) return "";
+    const marked = letters.slice(index, index + 2).join("").normalize("NFC");
+    return spelling[marked] ?? spelling[letter] ?? letter;
+  }).join("");
+  const readable = script === "malayalam"
+    ? normalized.replace(/ñc/g, "nc").replace(/ē/g, "e").replace(/ō/g, "o").replace(/ṟ/g, "r").replace(/ñ/g, "nj")
+    : normalized;
+  return readable;
 }
 
 /** Offline script fallback; Gemini supplies contextual pronunciation when configured. */
@@ -98,6 +95,13 @@ export async function romanizeDocument(
     );
     Sanscript.addBrahmicScheme(`lumaire_${script}`, scheme);
   }
+
+  if (!Sanscript.schemes.lumaire_devanagari_roman) {
+    const roman = structuredClone(Sanscript.schemes.iast);
+    roman.yogavaahas["ं"] = "n";
+    roman.yogavaahas["ँ"] = "n";
+    Sanscript.addRomanScheme("lumaire_devanagari_roman", roman);
+  }
   const result: Record<string, string> = {};
   const japanese = doc.lines.some(item => /[\u3040-\u30ff]/.test(item.text)) || Object.values(doc.lineLanguages ?? {}).flat().some(code => /^(?:ja|jpn)(?:-|$)/i.test(code));
   for (const line of doc.lines) {
@@ -134,13 +138,21 @@ export async function romanizeDocument(
         ? Sanscript.t(
             text,
             `lumaire_${script}`,
-            script === "tamil" ? "lumaire_tamil_roman" : script === "malayalam" ? "lumaire_malayalam_roman" : "iast",
+            script === "tamil" ? "lumaire_tamil_roman" : script === "malayalam" ? "lumaire_malayalam_roman" : script === "devanagari" ? "lumaire_devanagari_roman" : "iast",
           )
         : run;
-      spoken.push(script === "malayalam"
-        ? readableRoman(transliterated.replace(/ñc/g, "nc").replace(/ē/g, "e").replace(/ō/g, "o").replace(/ṟ/g, "r").replace(/ñ/g, "nj").replace(/t/g, "th"), script)
-        : readableRoman(transliterated, script));
-      return transliterated;
+      const pronunciation = script === "bengali"
+        ? readableRoman(transliterated.replace(/vāṃ/g, "baaṅ").replace(/~/g, "n"), script).replace(/ṅ/g, "n")
+        : script === "devanagari"
+          ? readableRoman(transliterated.replace(/~/g, "n"), script)
+              .replace(/(?<=[bcdfghjklmnpqrstvwxyz])a(?=$|\s|[,.;!?])/g, "")
+              .replace(/(?<=[bcdfghjklmnpqrstvwxyz])(?=\s|[,.;!?]|$)/g, "")
+          : script === "malayalam"
+            ? readableRoman(transliterated.replace(/ñc/g, "nc").replace(/ē/g, "e").replace(/ō/g, "o").replace(/ṟ/g, "r").replace(/ñ/g, "nj"), script)
+                .replace(/(?<=th)o(?=v)/g, "oo")
+            : readableRoman(transliterated, script);
+      spoken.push(pronunciation);
+      return pronunciation;
     });
     let runIndex = 0;
     const roman = (await romanizeForeign([line.text.replace(runs, () => spoken[runIndex++])], japanese))[0];
@@ -166,8 +178,14 @@ export async function romanizeDocument(
         const script = /[ৰৱ]/.test(run) ? "assamese" : scripts.find(([first, last]) => code >= first && code <= last)?.[2];
         return script ? readableRoman(Sanscript.t(run, script, "iast"), script) : run;
       });
-      if ((existing !== legacy && existing !== academic && existing !== legacyReadable && existing !== doc.localRomanisation?.[line.id]) || roman === existing)
+      if (
+        existing !== legacy &&
+        existing !== academic &&
+        existing !== legacyReadable &&
+        existing !== doc.localRomanisation?.[line.id]
+      )
         continue;
+      if (roman === existing) continue;
     }
     if (roman !== line.text) result[line.id] = roman;
   }

@@ -1,3 +1,5 @@
+import { groupRecordings } from "../../domain/recording-groups";
+import { onArtistResolution, resolvedArtists, isActiveArtistResolution, type ArtistResolution } from '../../adapters/artist-resolution';
 import { searchRetrieval } from "../../domain/search-retrieval";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -70,6 +72,8 @@ export interface DiscoveryViewProps extends CatalogActionHandlers, EngineSetupPr
   onNavigateArtist?: (artistId: string) => void;
   onNavigateAlbum?: (albumId: string) => void;
   onNavigateChart?: (chartId: string) => void;
+  onNavigateMood?: (mood: string) => void;
+  onNavigateGenre?: (genre: string) => void;
   recentRecords: ListeningRecord[];
   historyEnabled: boolean;
   onReplay: (record: ListeningRecord) => void;
@@ -225,6 +229,8 @@ export function DiscoveryView({
   onNavigateArtist,
   onNavigateAlbum,
   onNavigateChart,
+  onNavigateMood,
+  onNavigateGenre,
   recentRecords,
   historyEnabled,
   onReplay,
@@ -236,6 +242,14 @@ export function DiscoveryView({
   const searchWrapRef = useRef<HTMLDivElement>(null);
   const searchGeneration = useRef(0);
   const searchCancellation = useRef<AbortController | null>(null);
+  const activeArtistSearch = useRef<{ query: string; requestId: string; confirmed: ArtistResolution[] } | null>(null);
+  useEffect(() => onArtistResolution(value => {
+    const active = activeArtistSearch.current;
+    if (!active || !isActiveArtistResolution(value, active.query, active.requestId)) return;
+    active.confirmed.push(value);
+    onStateChange(current => current.query.trim() === active.query && current.searchedQuery === active.query
+      ? { ...current, artists: resolvedArtists(current.artists, active.confirmed) } : current);
+  }), [onStateChange]);
   const [recentSearches, setRecentSearches] = useState(() => discoveryPreferences().searches);
   const [searchFocused, setSearchFocused] = useState(false);
   const [discoverRevision, setDiscoverRevision] = useState(0);
@@ -261,6 +275,7 @@ export function DiscoveryView({
     onStateChange(current => ({ ...current, searching: false }));
   }, []);
   const { query, results, artists, albums, searchedQuery, entityError, searching, error, filter } = state;
+  const visibleRecordings = groupRecordings(results, savedTracks, favorites).slice(0, 20).map(group => group.primary);
   const activeFilter: SearchCategoryFilter = filter || "songs";
 
   useLayoutEffect(() => {
@@ -285,10 +300,12 @@ export function DiscoveryView({
     const controller = new AbortController();
     searchCancellation.current = controller;
     const generation = ++searchGeneration.current;
+    const active = { query: trimmed, requestId: crypto.randomUUID(), confirmed: [] as ArtistResolution[] };
+    activeArtistSearch.current = active;
     onStateChange((current) => ({
       ...current,
       searching: true,
-      query: trimmed,
+      query: requested,
       scrollTop: 0,
       results: [],
       artists: [],
@@ -304,16 +321,16 @@ export function DiscoveryView({
       if (--pending === 0 && generation === searchGeneration.current)
         onStateChange(current => ({ ...current, searching: false }));
     };
-    void searchRetrieval(trimmed, 20, library.searchCatalog, { knownTracks: savedTracks, signal: controller.signal, onExpandedArtists: artists => {
+    void searchRetrieval(trimmed, 60, library.searchCatalogRecords, { knownTracks: savedTracks, signal: controller.signal, onExpandedArtists: artists => {
       expandedArtists = artists;
-      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: [...new Map([...current.artists, ...artists].map(artist => [artist.id, artist])).values()] }));
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: resolvedArtists([...current.artists, ...artists], active.confirmed) }));
     } }).then(results => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, results }));
     }, error => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, error: String(error) }));
     }).finally(finish);
-    void library.searchCatalogEntities(trimmed).then(entities => {
-      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: [...new Map([...expandedArtists, ...entities.artists].map(artist => [artist.id, artist])).values()], albums: entities.albums, entityError: entities.warning || "" }));
+    void library.searchCatalogEntities(trimmed, active.requestId).then(entities => {
+      if (generation === searchGeneration.current) onStateChange(current => ({ ...current, artists: resolvedArtists([...expandedArtists, ...entities.artists], active.confirmed), albums: entities.albums, entityError: entities.warning || "" }));
     }, error => {
       if (generation === searchGeneration.current) onStateChange(current => ({ ...current, entityError: String(error) }));
     }).finally(finish);
@@ -321,12 +338,13 @@ export function DiscoveryView({
 
   useEffect(() => {
     const trimmed = query.trim();
+    activeArtistSearch.current = null;
     if (!trimmed) {
       onStateChange(current => ({ ...current, searching: false, searchedQuery: "", results: [], artists: [], albums: [], error: "", entityError: "", filter: "songs" }));
       return;
     }
     onStateChange(current => ({ ...current, searching: true }));
-    const timer = window.setTimeout(() => handleSearch(trimmed), 350);
+    const timer = window.setTimeout(() => handleSearch(query), 350);
     return () => { window.clearTimeout(timer); searchGeneration.current++; searchCancellation.current?.abort(); };
   }, [query]);
 
@@ -491,8 +509,8 @@ export function DiscoveryView({
           <div className="explore-sections">
             <DiscoverShelves busy={busy} ytdlpAvailable={ytdlpAvailable} downloads={downloads} onSaveDiscovery={onSaveDiscovery} onNavigateAlbum={onNavigateAlbum} onNavigateArtist={onNavigateArtist} onNavigateChart={onNavigateChart} savedTracks={savedTracks} favorites={favorites} onCatalogAction={onCatalogAction} onPlayAlbum={onPlayAlbum} onPlayCollection={onPlayCollection} revision={discoverRevision} onLoadingChange={setDiscoverLoading} />
             {[
-              { title: "Moods & moments", items: MOODS_MOMENTS },
-              { title: "Genres", items: GENRES },
+              { title: "Moods & moments", items: MOODS_MOMENTS, navigate: onNavigateMood },
+              { title: "Genres", items: GENRES, navigate: onNavigateGenre },
             ].map((section) => (
               <section key={section.title} aria-label={section.title} className="discover-editorial-section">
                 <h2>{section.title}</h2>
@@ -503,7 +521,7 @@ export function DiscoveryView({
                       className="explore-card"
                       key={item.name}
                       style={{ backgroundColor: item.color }}
-                      onClick={() => onStateChange((current) => ({ ...current, query: item.name, filter: "songs" }))}
+                      onClick={() => section.navigate?.(item.name)}
                     >
                       <img
                         src={item.image}
@@ -545,7 +563,7 @@ export function DiscoveryView({
                 onClick={() => onStateChange((current) => ({ ...current, filter: "songs" }))}
               >
                 <span>Songs</span>
-                {results.length > 0 && <span className="search-pill-count">{results.length}</span>}
+                {results.length > 0 && <span className="search-pill-count">{visibleRecordings.length}</span>}
               </button>
               <button
                 type="button"
@@ -589,7 +607,7 @@ export function DiscoveryView({
                       <span />
                     </div>
                     <div className="track-list">
-                      {results.map((t, index) => {
+                      {visibleRecordings.map((t, index) => {
                         const music = t;
                         return (
                           <div
@@ -671,7 +689,7 @@ export function DiscoveryView({
                       })}
                     </div>
                     <p className="library-footer">
-                      <span className="small-dot" /> Music catalogue · {results.length} tracks
+                      <span className="small-dot" /> Music catalogue · {visibleRecordings.length} tracks
                     </p>
                   </>
                 ) : (
@@ -713,11 +731,13 @@ export function DiscoveryView({
                         key={artist.id}
                         type="button"
                         className="search-artist-card"
+                        data-artist-id={artist.id}
                         aria-label={`Open artist ${artist.name}`}
                         onClick={() => onNavigateArtist?.(artist.id)}
                       >
                         <Artwork url={artist.artworkUrl} kind="artist" />
                         <span className="search-artist-name" title={artist.name}>{artist.name}</span>
+
                       </button>
                     ))}
                   </div>

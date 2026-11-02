@@ -3,6 +3,16 @@ import { cachedHomeAlbums, clearDiscoverySearches, discoveryPreferences, loadHom
 import { library } from "./native";
 import { discoveryTrendingItems } from "./discovery-home";
 import type { DiscoverPage } from "./native";
+import {featuredAlbum} from './discovery-home';
+it('rotates featured albums by local day, stable across feed reordering and duplicate IDs',()=>{
+  const albums=[album,{...album,id:'saavn:album:43',title:'Second'},{...album,id:'saavn:album:44',title:'Third'}];
+  const morning=new Date(2026,9,29,1),evening=new Date(2026,9,29,23),tomorrow=new Date(2026,9,30,1);
+  expect(featuredAlbum(albums,morning)?.id).toBe(featuredAlbum([...albums].reverse(),evening)?.id);
+  expect(featuredAlbum(albums,morning)?.id).not.toBe(featuredAlbum(albums,tomorrow)?.id);
+  expect(featuredAlbum([...albums,albums[0]],morning)?.id).toBe(featuredAlbum(albums,morning)?.id);
+  expect(featuredAlbum([],morning)).toBeUndefined();
+  expect(featuredAlbum([album],tomorrow)).toEqual(album);
+});
 vi.mock("./native", () => ({ library: { discoverAlbums: vi.fn(), discoverPage: vi.fn() } }));
 const album = { id: "saavn:album:42", title: "Album", artist: "Artist", artists: [], artworkUrl: "https://c.saavncdn.com/a.jpg" };
 beforeEach(() => {

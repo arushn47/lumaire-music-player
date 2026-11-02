@@ -44,12 +44,21 @@ const baseProps: MobileNowPlayingProps = {
   onClearQueue: vi.fn(),
 };
 
+it('keeps optional correction inside the song menu without a permanent verification prompt',()=>{
+  const html=renderToStaticMarkup(<MobileNowPlaying {...baseProps} onWrongVersion={()=>{}}/>);
+  expect(html).toContain('aria-label="Current song actions"');expect(html).toContain('Wrong version playing?');
+  expect(html).not.toContain('Verify song');expect(html).not.toContain('Confirm correct recording');expect(html).not.toContain('source-chooser');
+  expect(renderToStaticMarkup(<MobileNowPlaying {...baseProps}/>)).not.toContain('Wrong version playing?');
+});
+
 it("renders the mobile Now Playing screen with track metadata and transport controls", () => {
   const html = renderToStaticMarkup(<MobileNowPlaying {...baseProps} />);
   expect(html).toContain("Magale (From &quot;Baththa&quot;)");
   expect(html).toContain("Sai Abhyankkar");
   expect(html).toContain("0:45");
   expect(html).toContain("4:17");
+  expect(html).toContain('aria-label="Add to playlist"');
+  expect(html).toContain('aria-label="Save to favorites"');
   expect(html).toContain('aria-label="Pause"');
   expect(html).toContain('aria-label="Previous track"');
   expect(html).toContain('aria-label="Next track"');

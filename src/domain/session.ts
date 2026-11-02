@@ -1,3 +1,4 @@
+import {recordingMetadata} from './metadata-enrichment';
 import { defaults, type QueueItem, type Session, type Track } from "./types";
 import { isCatalogId, isQueuedCatalog } from "./queue";
 import { restoreReplica } from './device-sync';
@@ -20,7 +21,7 @@ export function restoreSession(value: unknown, tracks: Track[]): Session {
     const t = candidate as Track;
     const source = t?.source;
     if (t?.id === id && isQueuedCatalog(t) && [t.title, t.artist, t.album, t.fileName].every(value => typeof value === "string" && value.length <= 4000) && Number.isFinite(t.duration) && t.duration >= 0) {
-      queueTracks[id] = { id, metadataSourceId: id, title: t.title, artist: t.artist, album: t.album, fileName: "", format: "catalog", duration: t.duration, missing: false,
+      queueTracks[id] = { id, recordingMetadata: recordingMetadata(t.recordingMetadata), metadataSourceId: id, title: t.title, artist: t.artist, album: t.album, fileName: "", format: "catalog", duration: t.duration, missing: false,
         artworkUrl: typeof t.artworkUrl === "string" && t.artworkUrl.startsWith("https://") ? t.artworkUrl : null };
       continue;
     }
@@ -65,6 +66,7 @@ export function restoreSession(value: unknown, tracks: Track[]): Session {
       ...(typeof t.metadataSourceId === "string" && isCatalogId(t.metadataSourceId)
         ? { metadataSourceId: t.metadataSourceId }
         : {}),
+      recordingMetadata: recordingMetadata(t.recordingMetadata),
       source: {
         providerId: source.providerId,
         sourceId: source.sourceId,
@@ -201,7 +203,7 @@ export function restoreSession(value: unknown, tracks: Track[]): Session {
       : [],
     settings: {
       themeMode: p.themeMode === "light" ? "light" : "dark",
-      fullscreenLayout: p.fullscreenLayout === "minimal" ? "minimal" : "immersive",
+      fullscreenLayout: "immersive",
       accentColor:
         typeof p.accentColor === "string" &&
         /^#[0-9a-fA-F]{6}$/.test(p.accentColor)
@@ -231,4 +233,8 @@ export function restoreSession(value: unknown, tracks: Track[]): Session {
       autoGemini: p.autoGemini !== false,
     },
   };
+}
+export function toggleArtistFavorite(artists: Session['favoriteArtists'], artist: Session['favoriteArtists'][number], verifiedIds: string[] = []): Session['favoriteArtists'] {
+  const aliases = new Set([artist.id, ...verifiedIds]);
+  return artists.some(saved => aliases.has(saved.id)) ? artists.filter(saved => !aliases.has(saved.id)) : [...artists, artist];
 }

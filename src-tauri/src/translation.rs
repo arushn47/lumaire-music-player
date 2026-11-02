@@ -2,7 +2,7 @@ use crate::Result;
 use serde::Deserialize;
 use std::collections::{HashMap, HashSet};
 
-#[derive(Deserialize, serde::Serialize)]
+#[derive(Clone, Deserialize, serde::Serialize)]
 pub struct Line {
     pub id: String,
     pub text: String,

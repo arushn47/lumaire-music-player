@@ -6,6 +6,7 @@
   "permissions": [
     "lumaire-android:allow-navigation",
     "lumaire-android:allow-register-listener",
-    "lumaire-android:allow-remove-listener"
+    "lumaire-android:allow-remove-listener",
+    "lumaire-android:allow-downloadNotification"
   ]
 }

@@ -122,7 +122,15 @@ export function Artwork({
   };
 
   return (
-    <span className={`cover ${className}`} ref={ref}>
+    <span
+      className={`cover ${className}`}
+      ref={ref}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       {canShow && imgSrc ? (
         <img
           src={imgSrc}
@@ -139,8 +147,8 @@ export function Artwork({
           className="artist-fallback-icon"
           aria-hidden="true"
         >
-          <circle cx="12" cy="7" r="4.2" />
-          <path d="M12 13.5c-4.4 0-8 3-8 7.5h16c0-4.5-3.6-7.5-8-7.5z" />
+          <circle cx="12" cy="7" r="4" />
+          <path d="M12 13.5c-3.8 0-6.8 2.5-7.1 5.8-.1.6.4 1.2 1 1.2h12.2c.6 0 1.1-.6 1-1.2-.3-3.3-3.3-5.8-7.1-5.8z" />
         </svg>
       ) : (
         <Music2 size={20} />

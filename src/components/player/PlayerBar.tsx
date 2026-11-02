@@ -27,6 +27,7 @@ import type { Track, Session, Preferences } from "../../domain/types";
 import type { Playback } from "../../player/controller";
 
 export interface PlayerBarProps {
+  onWrongVersion?: () => void;
   titleCharacterLimit?: number;
   autoplayLoading?: boolean;
   onFloatingLyrics?: () => void;
@@ -35,6 +36,7 @@ export interface PlayerBarProps {
   floatingLyricsBusy?: boolean;
   onExpand?: () => void;
   expanded?: boolean;
+  noLyrics?: boolean;
   isFullscreen?: boolean;
   onToggleFullscreen?: () => void;
   onNavigateArtist?: (id: string) => void;
@@ -61,10 +63,144 @@ export interface PlayerBarProps {
   onSetting: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void;
 }
 
+export function formatWordTruncatedTitle(rawTitle: string, limit: number = 28): string {
+  if (!rawTitle || limit <= 0 || rawTitle.length <= limit) return rawTitle;
+
+  const sliced = rawTitle.slice(0, limit);
+  const lastSpace = sliced.lastIndexOf(" ");
+  let candidate = lastSpace > 0 ? sliced.slice(0, lastSpace) : sliced;
+
+  const openParen = candidate.lastIndexOf("(");
+  const closeParen = candidate.lastIndexOf(")");
+  if (openParen !== -1 && openParen > closeParen) {
+    candidate = candidate.slice(0, openParen);
+  }
+
+  const openBracket = candidate.lastIndexOf("[");
+  const closeBracket = candidate.lastIndexOf("]");
+  if (openBracket !== -1 && openBracket > closeBracket) {
+    candidate = candidate.slice(0, openBracket);
+  }
+
+  candidate = candidate.replace(/[\s([{\-–—,:;./\\|~]+$/, "").trimEnd();
+
+  if (!candidate) {
+    candidate = sliced.trimEnd();
+  }
+
+  return `${candidate}…`;
+}
+
 const clock = (s: number) =>
   `${Math.floor((Number.isFinite(s) ? s : 0) / 60)}:${String(Math.floor((Number.isFinite(s) ? s : 0) % 60)).padStart(2, "0")}`;
 
+export interface TrackActionMenuItemsProps {
+  onWrongVersion?: () => void;
+  track: Track | null | undefined;
+  tracks: Track[];
+  busy?: boolean;
+  session: Session;
+  downloads: Record<string, string>;
+  onSaveOnline: (track: Track) => void;
+  onChoosePlaylist: (track: Track) => void;
+  onFavorite: (trackId: string) => void;
+  onCancelDownload: (trackId: string) => void;
+  onDownloadTrack: (track: Track) => void;
+  onDeleteOffline: (track: Track) => void;
+  onAction?: () => void;
+}
+
+export function TrackActionMenuItems({
+  onWrongVersion,
+  track,
+  tracks,
+  busy = false,
+  session,
+  downloads,
+  onSaveOnline,
+  onChoosePlaylist,
+  onFavorite,
+  onCancelDownload,
+  onDownloadTrack,
+  onDeleteOffline,
+  onAction,
+}: TrackActionMenuItemsProps) {
+  if (!track) return null;
+  const correction=onWrongVersion&&!track.offline&&(track.metadataSourceId||track.format==='catalog'||track.format==='online')&&(track.format==='catalog'||track.format==='online'||track.id.startsWith('youtube:'))
+    ? <button type="button" onClick={event=>{const menu=event.currentTarget.closest('details');if(menu)menu.open=false;onAction?.();onWrongVersion();}}>Wrong version playing?</button> : null;
+  return (
+    <>
+      {correction}
+      {!tracks.some((saved) => saved.id === track.id) && (
+        <button
+          disabled={busy}
+          aria-label="Save"
+          onClick={() => {
+            onAction?.();
+            onSaveOnline(track);
+          }}
+        >
+          Save to library
+        </button>
+      )}
+      <button
+        disabled={busy}
+        aria-label="Add to playlist"
+        onClick={() => {
+          onAction?.();
+          onChoosePlaylist(track);
+        }}
+      >
+        Save to playlist
+      </button>
+      <button
+        onClick={() => {
+          onAction?.();
+          onFavorite(track.id);
+        }}
+      >
+        {session.favorites.includes(track.id)
+          ? "Remove from favorites"
+          : "Add to favorites"}
+      </button>
+      {track.source &&
+        !track.offline &&
+        (downloads[track.id] === "downloading" ? (
+          <button
+            onClick={() => {
+              onAction?.();
+              onCancelDownload(track.id);
+            }}
+          >
+            Cancel download
+          </button>
+        ) : (
+          <button
+            aria-label="Download current track for offline"
+            onClick={() => {
+              onAction?.();
+              onDownloadTrack(track);
+            }}
+          >
+            Download for offline
+          </button>
+        ))}
+      {track.offline && (
+        <button
+          onClick={() => {
+            onAction?.();
+            onDeleteOffline(track);
+          }}
+        >
+          Delete offline copy
+        </button>
+      )}
+    </>
+  );
+}
+
 export function PlayerBar({
+  onWrongVersion,
   titleCharacterLimit,
   autoplayLoading = false,
   onFloatingLyrics,
@@ -73,6 +209,7 @@ export function PlayerBar({
   floatingLyricsBusy,
   onExpand,
   expanded = false,
+  noLyrics = false,
   isFullscreen = false,
   onToggleFullscreen,
   onNavigateArtist,
@@ -177,87 +314,34 @@ export function PlayerBar({
   }, [contextMenu]);
 
   const renderTrackMenuItems = (onAction?: () => void) => (
-    <>
-      {!tracks.some((saved) => saved.id === track?.id) && track && (
-        <button
-          disabled={busy}
-          aria-label="Save"
-          onClick={() => {
-            onAction?.();
-            onSaveOnline(track);
-          }}
-        >
-          Save to library
-        </button>
-      )}
-      {track && (
-        <button
-          disabled={busy}
-          onClick={() => {
-            onAction?.();
-            onChoosePlaylist(track);
-          }}
-        >
-          Save to playlist
-        </button>
-      )}
-      {track && (
-        <button
-          onClick={() => {
-            onAction?.();
-            onFavorite(track.id);
-          }}
-        >
-          {session.favorites.includes(track.id)
-            ? "Remove from favorites"
-            : "Add to favorites"}
-        </button>
-      )}
-      {track?.source &&
-        !track.offline &&
-        (downloads[track.id] === "downloading" ? (
-          <button
-            onClick={() => {
-              onAction?.();
-              onCancelDownload(track.id);
-            }}
-          >
-            Cancel download
-          </button>
-        ) : (
-          <button
-            aria-label="Download current track for offline"
-            onClick={() => {
-              onAction?.();
-              onDownloadTrack(track);
-            }}
-          >
-            Download for offline
-          </button>
-        ))}
-      {track?.offline && (
-        <button
-          onClick={() => {
-            onAction?.();
-            onDeleteOffline(track);
-          }}
-        >
-          Delete offline copy
-        </button>
-      )}
-    </>
+    <TrackActionMenuItems
+      onWrongVersion={onWrongVersion}
+      track={track}
+      tracks={tracks}
+      busy={busy}
+      session={session}
+      downloads={downloads}
+      onSaveOnline={onSaveOnline}
+      onChoosePlaylist={onChoosePlaylist}
+      onFavorite={onFavorite}
+      onCancelDownload={onCancelDownload}
+      onDownloadTrack={onDownloadTrack}
+      onDeleteOffline={onDeleteOffline}
+      onAction={onAction}
+    />
   );
 
   const activeTime = scrubbingTime ?? Math.min(playback.time, playback.duration || 1);
-  const titleLimit = titleCharacterLimit ?? (mobile ? 48 : 28);
+  const titleLimit =
+    titleCharacterLimit ?? (mobile ? 48 : expanded ? (noLyrics ? 42 : 28) : 28);
   const rawTitle =
     (track?.title && track.title.trim()) ||
     (track?.fileName && track.fileName.trim()) ||
     "Room for a little music";
-  const isTitleLong = rawTitle.length > titleLimit;
-  const displayTitle = isTitleLong
-    ? `${rawTitle.slice(0, titleLimit).trimEnd()}...`
-    : rawTitle;
+  const displayTitle = formatWordTruncatedTitle(rawTitle, titleLimit);
+
+
+
 
   const rawArtist =
     (track?.artist && track.artist.trim()) ||
@@ -366,7 +450,7 @@ export function PlayerBar({
         >
           <span className="now-playing-title-wrap">
             <strong dir="auto">
-              {expanded && titleCharacterLimit === undefined ? rawTitle : displayTitle}
+              {displayTitle}
             </strong>
             {Boolean(track?.title) && (
               <span className="title-hover-tooltip" role="tooltip">
@@ -379,8 +463,9 @@ export function PlayerBar({
               <small dir="auto" className="now-playing-artist">
                 {track ? (
                   <ArtistLinks
+                    catalogId={track.metadataSourceId}
                     artistString={rawArtist}
-                    onNavigateArtist={onNavigateArtist}
+                    onNavigateArtist={mobile ? undefined : onNavigateArtist}
                     maxArtists={mobile ? 3 : 2}
                   />
                 ) : (
@@ -417,7 +502,7 @@ export function PlayerBar({
           </IconButton>
         )}
 
-        {track && track.format !== "catalog" && (
+        {track && !expanded && (track.format !== "catalog" || onWrongVersion) && (
           <details className="track-menu current-track-menu">
             <summary aria-label="Current song actions" title="Song actions"><Ellipsis size={20} aria-hidden="true" /></summary>
             <div className="menu-popover">

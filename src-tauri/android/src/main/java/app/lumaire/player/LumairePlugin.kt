@@ -27,9 +27,26 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 @TauriPlugin
-class LumairePlugin(private val activity: Activity) : Plugin(activity) {
+class LumairePlugin(private var activity: Activity) : Plugin(activity) {
+    private var destroyed = false
     private var webView: WebView? = null
+    private var notificationPermissionRequested = false
     override fun load(webView: WebView) { this.webView = webView }
+    override fun onResume(activity: androidx.appcompat.app.AppCompatActivity) {
+        if (destroyed) {
+            this.activity = activity
+            destroyed = false
+            io = Executors.newSingleThreadExecutor()
+            NativeQueueBridge.reopenWindow()
+        }
+    }
+    override fun onDestroy(activity: androidx.appcompat.app.AppCompatActivity) {
+        destroyed = true
+        controller?.removeListener(playbackListener); controller?.release(); controller = null
+        webView = null
+        waiting.clear()
+        io.shutdown()
+    }
 
     @Command
     fun navigation(invoke: Invoke) {
@@ -42,18 +59,50 @@ class LumairePlugin(private val activity: Activity) : Plugin(activity) {
                     it.requestFocus()
                     activity.getSystemService(InputMethodManager::class.java).showSoftInput(it, InputMethodManager.SHOW_IMPLICIT)
                 }
+                "finishForTest" -> if (BuildConfig.DEBUG) { invoke.resolve(); activity.finish(); return@runOnUiThread }
+                    else { invoke.reject("Test navigation is unavailable."); return@runOnUiThread }
                 else -> { invoke.reject("Unknown navigation action."); return@runOnUiThread }
             }
             invoke.resolve()
         }
     }
+
+    @Command
+    fun downloadNotification(invoke: Invoke) {
+        val args = invoke.getArgs()
+        val active = args.optBoolean("active", false)
+        val title = args.optString("title", "Downloading audio")
+        val done = args.optInt("done", 0)
+        val total = args.optInt("total", 0)
+
+        try {
+            NativeQueueBridge.downloadActivity(active)
+            if (active && android.os.Build.VERSION.SDK_INT >= 33 &&
+                !notificationPermissionRequested && ContextCompat.checkSelfPermission(activity, android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionRequested = true
+                activity.requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1002)
+            }
+            val intent = Intent(activity, DownloadForegroundService::class.java).apply {
+                action = if (active) DownloadForegroundService.UPDATE else DownloadForegroundService.STOP
+                putExtra(DownloadForegroundService.TITLE, title)
+                putExtra(DownloadForegroundService.DONE, done)
+                putExtra(DownloadForegroundService.TOTAL, total)
+            }
+            if (active) ContextCompat.startForegroundService(activity, intent)
+            else activity.startService(intent)
+            invoke.resolve()
+        } catch (error: Exception) {
+            invoke.reject(error.message ?: "Could not keep Android downloads running in the background.")
+        }
+    }
     private var controller: MediaController? = null
-    private val resolver = ResolverClient(activity.applicationContext)
-    private val io = Executors.newSingleThreadExecutor()
+    private val resolver = ResolverClient.shared(activity.applicationContext)
+    private var io = Executors.newSingleThreadExecutor()
     private var connecting = false
     private val waiting = mutableListOf<Pair<Invoke, (MediaController) -> Unit>>()
     private val playbackListener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) {
+            if (destroyed) return
             if (events.contains(Player.EVENT_PLAYER_ERROR) && player.playerError != null) resolver.invalidate()
             // Native completion/error events bypass hidden WebView timer throttling.
             if (events.containsAny(Player.EVENT_PLAYBACK_STATE_CHANGED, Player.EVENT_IS_PLAYING_CHANGED,
@@ -65,6 +114,7 @@ class LumairePlugin(private val activity: Activity) : Plugin(activity) {
 
     private fun withPlayer(invoke: Invoke, operation: (MediaController) -> Unit) {
         activity.runOnUiThread {
+            if (destroyed) { invoke.reject("The player window closed."); return@runOnUiThread }
             val active = controller
             if (active != null) { operation(active); return@runOnUiThread }
             waiting.add(Pair(invoke, operation))
@@ -76,7 +126,9 @@ class LumairePlugin(private val activity: Activity) : Plugin(activity) {
                 connecting = false
                 val pending = waiting.toList(); waiting.clear()
                 try {
-                    val player = future.get(); controller = player
+                    val player = future.get()
+                    if (destroyed) { player.release(); return@addListener }
+                    controller = player
                     player.addListener(playbackListener)
                     pending.forEach { (request, action) ->
                         try { action(player) } catch (_: Exception) { request.reject("Playback action failed.") }
@@ -89,6 +141,7 @@ class LumairePlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     private fun state(player: MediaController): JSObject = JSObject().apply {
+        val queue = PlaybackService.active?.queue
         val failure = player.playerError
         put("status", when {
             failure != null -> "error"
@@ -108,10 +161,50 @@ class LumairePlugin(private val activity: Activity) : Plugin(activity) {
             put("nativeListenedMs", PlaybackService.listenedMs)
         }
         put("seekable", player.isCurrentMediaItemSeekable)
+        put("nativeStateAt", android.os.SystemClock.elapsedRealtime())
+        put("nativeHistoryRevision", queue?.historyVersion ?: 0L)
+        put("nativeQueueRevision", queue?.version ?: 0L)
+        put("nativeQueueEpoch", queue?.epoch)
+        queue?.snapshot()?.let { put("nativeQueue", it) }
+        if (queue?.busy == true) { put("status", "loading"); queue.selectedTrackId?.let { put("id", it) } }
+        queue?.error?.let { put("status", "error"); put("error", it) }
         put("autoplay", player.playWhenReady)
         val pending = WidgetUpdateHelper.consumePendingAction()
         if (pending != null) {
             put("pendingAction", pending)
+        }
+    }
+
+    @Command
+    fun debugMediaRefusal(invoke: Invoke) {
+        if (!BuildConfig.DEBUG) { invoke.reject("Test transport is unavailable."); return }
+        ScopedHttpHeaders.debugRefuseNext(); invoke.resolve()
+    }
+
+    @Command
+    fun invalidateQueue(invoke: Invoke) {
+        activity.runOnUiThread { PlaybackService.active?.queue?.invalidate(); invoke.resolve() }
+    }
+
+    @Command
+    fun startBackgroundQueue(invoke: Invoke) {
+        if (!BuildConfig.HAS_ANDROID_STREAMING) { invoke.reject("Native queue runtime unavailable."); return }
+        withPlayer(invoke) { player ->
+            val args = invoke.getArgs()
+            try {
+                ContextCompat.startForegroundService(activity, Intent(activity, PlaybackService::class.java))
+                PlaybackService.active?.queue?.start(args.getJSONObject("queue"), args.optBoolean("autoplay", true), args.optDouble("position", 0.0))
+                invoke.resolve(state(player))
+            } catch (_: Exception) { invoke.reject("Background playback could not start. Reopen the player and try again.") }
+        }
+    }
+
+    @Command
+    fun backgroundQueue(invoke: Invoke) {
+        withPlayer(invoke) { player ->
+            val args = invoke.getArgs()
+            val accepted = BuildConfig.HAS_ANDROID_STREAMING && PlaybackService.active?.queue?.accept(args.getJSONObject("queue"), args.optLong("revision", -1)) == true
+            invoke.resolve(state(player).apply { put("accepted", accepted) })
         }
     }
 
@@ -200,6 +293,7 @@ class LumairePlugin(private val activity: Activity) : Plugin(activity) {
         }
         activity.runOnUiThread {
             resolver.request(args) { result, error ->
+                if (destroyed) return@request
                 if (error != null) invoke.reject(error) else invoke.resolve(JSObject(result.toString()))
             }
         }
@@ -315,13 +409,4 @@ class LumairePlugin(private val activity: Activity) : Plugin(activity) {
         }
     }
 
-    override fun onDestroy() {
-        // Release this Activity's controller, not the service's active player.
-        activity.runOnUiThread {
-            resolver.cancel()
-            controller?.run { removeListener(playbackListener); release() }
-            controller = null
-        }
-        io.shutdown()
-    }
 }

@@ -14,6 +14,7 @@ struct Response {
 #[derive(Debug, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogTrack {
+    pub recording_metadata: Option<crate::recording_metadata::RecordingMetadata>,
     pub play_count: Option<u64>,
     pub genre: Option<String>,
     pub language: Option<String>,
@@ -38,6 +39,7 @@ pub struct CatalogArtistCredit {
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 struct Song {
+    wrapper_type: Option<String>,
     kind: Option<String>,
     primary_genre_name: Option<String>,
     track_id: Option<u64>,
@@ -80,6 +82,7 @@ fn catalog_track(song: Song) -> Option<CatalogTrack> {
         return None;
     }
     Some(CatalogTrack {
+        recording_metadata: crate::recording_metadata::from_provider(format!("itunes:{id}"), &serde_json::Value::Null, song.release_date.as_deref().and_then(|date| date.split('T').next()), &serde_json::Value::Null),
         play_count: None,
         genre: song.primary_genre_name.filter(|name| !name.is_empty() && name.len() <= 200 && !name.chars().any(char::is_control)),
         language: None,
@@ -91,7 +94,7 @@ fn catalog_track(song: Song) -> Option<CatalogTrack> {
             let names = crate::catalog::artist_names(&artist);
             let single = names.len() == 1;
             names.into_iter().map(|name| CatalogArtistCredit {
-                id: if single { song.artist_id.map(|id| format!("itunes:{id}")) } else { Some(format!("artist:name:{}", urlencoding::encode(&name))) }, name,
+                id: if single { song.artist_id.filter(|id| *id > 0).map(|id| format!("itunes:{id}")) } else { None }, name,
             }).collect()
         },
         album: song.collection_name.unwrap_or_default().trim().to_string(),
@@ -338,6 +341,26 @@ pub(crate) async fn supplemental_metadata_from(base: &str, kind: &str, title: &s
 mod tests {
     use super::*;
     static HTTP: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    #[test]
+    fn captured_apple_identity_binds_collaborations_without_inventing_guest_ids() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!("../../tests/fixtures/artist-identity-live.json")).unwrap();
+        let raw = &corpus["responses"].as_array().unwrap().iter().find(|row|row["label"]=="apple-artist-1629301422").unwrap()["data"]["results"];
+        let rows: Vec<Song> = serde_json::from_value(raw.clone()).unwrap();
+        let profile = artist_details("itunes:1629301422".into(),1629301422,rows.clone()).unwrap();
+        assert_eq!(profile.info.name,"gini");
+        assert!(profile.top_tracks.iter().any(|row|row.title=="Don't Even Text"));
+        assert!(profile.top_tracks.iter().all(|row|row.artists.iter().any(|credit|credit.id.as_deref()==Some("itunes:1629301422"))));
+        let feeka = rows.iter().find(|row|row.track_name.as_deref()==Some("Feeka")).unwrap();
+        let parsed = catalog_track(feeka.clone()).unwrap();
+        assert_eq!(parsed.artist_id.as_deref(),Some("itunes:1629301422"));
+        assert!(parsed.artists.iter().all(|credit|credit.id.is_none()));
+        let owned = profile.top_tracks.iter().find(|row|row.title=="Feeka").unwrap();
+        assert_eq!(owned.artists[0].id.as_deref(),Some("itunes:1629301422"));
+        assert!(owned.artists[1].id.is_none());
+        assert!(artist_details("itunes:99".into(),99,rows.clone()).is_err());
+        assert!(artist_details("itunes:1629301422".into(),1629301422,rows.into_iter().filter(|row|row.wrapper_type.as_deref()!=Some("artist")).collect()).is_err());
+    }
 
     fn runtime() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
@@ -596,17 +619,6 @@ mod tests {
 
 use crate::catalog::{AlbumDetails, ArtistDetails, CatalogAlbum, CatalogArtist};
 
-pub async fn named_artist(name: &str) -> Result<ArtistDetails, String> {
-    for country in ["US", "IN"] {
-        let rows = request("https://itunes.apple.com/search", &[("term", name.into()), ("entity", "musicArtist".into()), ("country", country.into()), ("limit", "10".into())]).await;
-        let matching: Vec<_> = rows.unwrap_or_default().into_iter().filter(|row| row.artist_name.as_deref().is_some_and(|candidate| crate::catalog::same_name(candidate, name)) && row.artist_id.is_some()).collect();
-        let ids: HashSet<_> = matching.iter().filter_map(|row| row.artist_id).collect();
-        if ids.len() > 1 { return Err("Several artists have this exact name. Select a provider artist result.".into()); }
-        if let Some(id) = ids.into_iter().next() { return lookup_artist(format!("itunes:{id}")).await; }
-    }
-    Err(format!("No verified Apple artist identity matches '{name}'."))
-}
-
 pub async fn search_entities(query: &str) -> Result<crate::catalog::CatalogEntities, String> {
     let tracks = search_catalog(query.into(), Some(60)).await?;
     Ok(entities_from_tracks(query, tracks))
@@ -616,8 +628,10 @@ pub fn entities_from_tracks(query: &str, tracks: Vec<CatalogTrack>) -> crate::ca
     let mut seen_artists = HashSet::new(); let mut seen_albums = HashSet::new();
     for track in tracks {
         for credit in &track.artists {
-            if crate::catalog_search::relevance(query, &credit.name, "") > 0 && seen_artists.insert(crate::lyric_identity::fingerprint(&credit.name)) {
-                artists.push(CatalogArtist { id: credit.id.clone().unwrap_or_else(|| format!("artist:name:{}", urlencoding::encode(&credit.name))), name: credit.name.clone(), artwork_url: None });
+            if let Some(id) = credit.id.as_ref().filter(|id| crate::catalog::valid_artist_id(id)) {
+                if crate::catalog_search::relevance(query, &credit.name, "") > 0 && seen_artists.insert(id.clone()) {
+                    artists.push(CatalogArtist { id: id.clone(), name: credit.name.clone(), artwork_url: None });
+                }
             }
         }
         if let Some(id) = &track.album_id {
@@ -629,15 +643,6 @@ pub fn entities_from_tracks(query: &str, tracks: Vec<CatalogTrack>) -> crate::ca
     crate::catalog::CatalogEntities { artists, albums, warning: None }
 }
 
-pub async fn named_album(title: &str, artist: &str) -> Result<AlbumDetails, String> {
-    let entities = search_entities(&format!("{title} {artist}")).await?;
-    let matches: Vec<_> = entities.albums.into_iter().filter(|album| crate::catalog::same_name(&album.title, title) && album.artists.iter().any(|credit| crate::catalog::same_name(&credit.name, artist))).collect();
-    if matches.len() != 1 { return Err("No unambiguous Apple album matches the title and artist.".into()); }
-    let album = lookup_album(matches[0].id.clone()).await?;
-    if !crate::catalog::same_name(&album.info.title, title) || !album.tracks.iter().any(|track| track.artists.iter().any(|credit| crate::catalog::same_name(&credit.name, artist))) { return Err("Apple album identity did not match the requested release.".into()); }
-    Ok(album)
-}
-
 pub async fn lookup_artist(id: String) -> Result<ArtistDetails, String> {
     let artist_id = id
         .strip_prefix("itunes:")
@@ -645,40 +650,60 @@ pub async fn lookup_artist(id: String) -> Result<ArtistDetails, String> {
         .filter(|value| *value > 0 && id == format!("itunes:{value}"))
         .ok_or("Invalid Apple catalog artist ID.")?;
 
-    let mut songs = request(
+    let mut storefronts = Vec::new();
+    for country in ["IN", "US"] {
+    storefronts.push(request(
         "https://itunes.apple.com/lookup",
         &[
             ("id", artist_id.to_string()),
             ("entity", "song".into()),
             ("limit", "200".into()),
+            ("country", country.into()),
         ],
     )
-    .await?;
+    .await?);
+    }
+    // Interleave storefronts so the evidence cap cannot exclude US-only or India-only recordings.
+    let mut songs = Vec::new();
+    for index in 0..storefronts.iter().map(Vec::len).max().unwrap_or(0) {
+        for rows in &storefronts { if let Some(song) = rows.get(index) { songs.push(song.clone()); } }
+    }
 
     let releases = request("https://itunes.apple.com/lookup", &[("id", artist_id.to_string()), ("entity", "album".into()), ("limit", "200".into())]).await.unwrap_or_default();
     songs.extend(releases);
 
-    let songs: Vec<_> = songs.into_iter().filter(|song| song.artist_id == Some(artist_id)).collect();
+    artist_details(id, artist_id, songs)
+}
+
+fn artist_details(id: String, artist_id: u64, songs: Vec<Song>) -> Result<ArtistDetails, String> {
+    // Only the artist wrapper binds a name to an ID; a collaboration's display string does not.
+    let artist_name = songs.iter().find(|song| song.wrapper_type.as_deref() == Some("artist") && song.artist_id == Some(artist_id)).and_then(|song| song.artist_name.clone()).filter(|name| !name.trim().is_empty()).ok_or("Apple did not return the requested artist identity.")?;
+    let credited = |song: &Song| crate::catalog::artist_names(song.artist_name.as_deref().unwrap_or("")).iter().filter(|name| crate::catalog::same_name(name, &artist_name)).count() == 1;
+    // The ID-scoped lookup relationship also supplies collaborations with another primary artist ID.
+    let songs: Vec<_> = songs.into_iter().filter(|song| song.artist_id == Some(artist_id) || (song.kind.as_deref() == Some("song") && credited(song))).collect();
     let mut top_tracks = Vec::new();
     let mut albums_map = std::collections::HashMap::new();
-    let mut artist_name = songs.iter().find_map(|song| song.artist_name.clone()).unwrap_or_default();
-    let artist_artwork = None;
+    let artist_artwork = songs.iter().find_map(|song| artwork_url(song.artwork_url100.as_deref()));
+    let mut evidence = Vec::new();
 
     for song in songs {
         if let (Some(collection_id), Some(title)) = (song.collection_id, song.collection_name.as_deref()) {
             if !title.trim().is_empty() && song.artist_id == Some(artist_id) {
                 albums_map.entry(collection_id).or_insert_with(|| CatalogAlbum {
                     id: format!("itunes:{collection_id}"), title: title.into(), artist: song.artist_name.clone().unwrap_or_default(),
-                    artists: crate::catalog::artist_names(song.artist_name.as_deref().unwrap_or("")).into_iter().map(|name| CatalogArtistCredit { id: Some(if crate::catalog::same_name(&name, &artist_name) { id.clone() } else { format!("artist:name:{}", urlencoding::encode(&name)) }), name }).collect(),
+                    artists: crate::catalog::artist_names(song.artist_name.as_deref().unwrap_or("")).into_iter().map(|name| CatalogArtistCredit { id: crate::catalog::same_name(&name, &artist_name).then(|| id.clone()), name }).collect(),
                     artwork_url: artwork_url(song.artwork_url100.as_deref()), year: song.release_date.as_deref().and_then(|date| date.get(..4)).and_then(|year| year.parse().ok()), track_count: song.track_count,
                 });
             }
         }
-        if let Some(track) = catalog_track(song.clone()) {
-            if artist_name.is_empty() {
-                artist_name = track.artist.clone();
+        if let Some(mut track) = catalog_track(song.clone()) {
+            for credit in &mut track.artists {
+                if crate::catalog::same_name(&credit.name, &artist_name) { credit.id = Some(id.clone()); }
             }
-            if top_tracks.len() < 10 {
+            if evidence.len() < 100 && !evidence.iter().any(|old: &CatalogTrack| crate::catalog_search::same_recording(old, &track)) {
+                evidence.push(track.clone());
+            }
+            if top_tracks.len() < 10 && !top_tracks.iter().any(|old: &CatalogTrack| old.id == track.id) {
                 top_tracks.push(track.clone());
             }
             if let Some(album_id) = song.collection_id {
@@ -702,7 +727,7 @@ pub async fn lookup_artist(id: String) -> Result<ArtistDetails, String> {
     }
     let mut albums: Vec<_> = albums_map.into_values().collect();
     albums.sort_by(|a, b| a.title.cmp(&b.title));
-    Ok(ArtistDetails {
+    Ok(ArtistDetails { evidence, verified_ids: vec![],
         info: CatalogArtist {
             id,
             name: artist_name,

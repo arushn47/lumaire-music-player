@@ -2,6 +2,7 @@ import type { Playlist, Session, Track } from './types';
 import { portableTrack } from './nearby';
 
 export interface SyncCell { key: string; clock: number; device: string; value: unknown }
+export interface SyncPeer { deviceId: string; name: string; lastSeen: number }
 export interface PlaylistReplica { deviceId: string; clock: number; cells: Record<string, SyncCell>; favoritesInitialized?: boolean }
 export interface SyncState { deviceId: string; clock: number; revision: number; cells: SyncCell[]; historyEnabled: boolean; favoritesEnabled?: boolean }
 const key = (...parts: string[]) => JSON.stringify(parts);

@@ -51,3 +51,21 @@ it('orders playlists by latest edit with stable legacy ordering without mutating
   expect(positions).toEqual([...positions].sort((a, b) => a - b));
   expect(playlists[0].id).toBe('legacy-a');
 });
+
+it('renders search button in mobile header actions when onSearch is provided', () => {
+  const html = renderToStaticMarkup(
+    <Sidebar
+      view="search"
+      setView={() => {}}
+      onHome={() => {}}
+      collectionsCount={0}
+      playlists={[]}
+      collections={[]}
+      hasLyricsDoc={false}
+      onCreatePlaylist={() => {}}
+      onSearch={() => {}}
+    />,
+  );
+  expect(html).toContain('aria-label="Search"');
+  expect(html).toContain('mobile-header-btn selected');
+});

@@ -345,6 +345,7 @@ fn resolve(video_id: String) -> Result<YtdlpStreamInfo, String> {
     resolve_audio(video_id, "bestaudio[ext=m4a][vcodec=none]/bestaudio[ext=webm][vcodec=none]/bestaudio[vcodec=none]")
 }
 
+#[cfg_attr(target_os = "android", allow(dead_code))]
 pub async fn download_audio(video_id: String) -> Result<YtdlpStreamInfo, String> {
     if video_id.len() != 11
         || !video_id
@@ -461,6 +462,8 @@ fn validate_stream_url(value: &str) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn ytdlp_check_available() -> bool {
+    if find_ytdlp().is_err() { crate::components::auto_update().await; }
+    else { tauri::async_runtime::spawn(crate::components::auto_update()); }
     tauri::async_runtime::spawn_blocking(|| {
         let Ok(engine) = find_ytdlp() else { return false; };
         if crate::components::test_executable(&engine, &["--version"]).is_err() { return false; }

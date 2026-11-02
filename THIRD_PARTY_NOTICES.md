@@ -16,20 +16,19 @@ Sources: https://github.com/greyblake/whatlang-rs and https://github.com/zakarum
 
 ## Optional Windows streaming components
 
-Settings > Online Sources can explicitly download the official Windows x64
-yt-dlp 2026.08.19 executable and QuickJS-NG 0.17.0 runtime. Neither is bundled
-in Lumaire's Windows installer or silently fetched at startup. Downloads are
-version-pinned and verified against SHA-256 digests published on their official
-GitHub release pages. No system PATH, registry, or administrator changes are
-needed for these private app components.
+Windows checks the official stable yt-dlp release at most once per day and manages
+its private engine automatically. Downloads are verified against the SHA-256
+asset digest from the official GitHub release metadata, then startup-tested
+before activation. Failed updates preserve the installed set. QuickJS-NG 0.17.0
+remains pinned and checksum-verified. No system PATH, registry, administrator
+changes, account credentials or browser cookies are used.
 
 The official PyInstaller yt-dlp executable includes GPLv3+ components; see
 [its source, license and dependency notices](https://github.com/yt-dlp/yt-dlp/tree/2026.08.19#license).
 QuickJS-NG uses the MIT license; see
 [its source and license](https://github.com/quickjs-ng/quickjs/tree/v0.17.0).
 These independently downloaded tools do not grant rights to any streamed media.
-The Android runtime described below is unchanged and does not use this Windows
-component installer. Future pinned component versions require an app update.
+Android uses the separate verified Python-wheel updater described below.
 
 ## JavaScript dependencies
 
@@ -44,8 +43,13 @@ Their notices, this inventory and THIRD_PARTY_LICENSES.txt are packaged in Andro
 assets. No FFmpeg, Termux, GPL Android wrapper or PyInstaller executable is added.
 The exact resolved Android Java dependency inventory and ELF audit are generated
 under `test-results/android-runtime-dependencies.json` and
-`test-results/android-integrated-alignment.json`. Runtime code updates require a
-new APK; no external runtime/script component download is enabled.
+`test-results/android-integrated-alignment.json`. The bundled wheels remain an
+offline fallback. Once per day, Android can fetch the official stable yt-dlp wheel
+and its exact declared EJS dependency from PyPI, verify their published SHA-256
+digests, and smoke-test imports before activation in a private resolver process.
+QuickJS and Python updates still require an APK update. Downloaded wheels contain
+their upstream license notices. This distribution performs runtime code updates;
+app-store distribution requires a separate review of the store's applicable rules.
 
 Android prototype: Jetpack Media3 ExoPlayer and MediaSession 1.8.0 are used
 under Apache-2.0. Their source and notices are maintained in

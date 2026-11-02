@@ -17,7 +17,7 @@ function metadata(id: string): Promise<CatalogTrack> {
 const hasLanguage = (track?: CatalogTrack | null) => !!track?.language?.trim() && !['unknown', 'und', 'zxx'].includes(track.language.toLowerCase().trim());
 
 /** One original-song radio; an exact catalog match can recover missing language metadata. */
-export async function loadAutoplayPool(anchor: Track, active: () => boolean): Promise<{ candidates: RadioCandidate[]; metadata: CatalogTrack[] }> {
+export async function loadAutoplayPool(anchor: Track, active: () => boolean, budgetMs = 5000): Promise<{ candidates: RadioCandidate[]; metadata: CatalogTrack[] }> {
   const result: { candidates: RadioCandidate[]; metadata: CatalogTrack[] } = { candidates: [], metadata: [] };
   let accepting = true;
   const task = async () => {
@@ -46,7 +46,9 @@ export async function loadAutoplayPool(anchor: Track, active: () => boolean): Pr
       .map((track, position) => ({ track, position, sources: ['anchor'] }));
   };
   let timer: ReturnType<typeof setTimeout> | undefined;
-  await Promise.race([task().catch(() => { }), new Promise<void>(resolve => { timer = setTimeout(resolve, 5000); })]);
+  // The native worker already has a cancellable service deadline and synchronous RPC.
+  if (budgetMs === 0) await task().catch(() => { });
+  else await Promise.race([task().catch(() => { }), new Promise<void>(resolve => { timer = setTimeout(resolve, budgetMs); })]);
   clearTimeout(timer); accepting = false;
   return active() ? result : { candidates: [], metadata: [] };
 }

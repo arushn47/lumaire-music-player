@@ -1,33 +1,31 @@
-import { expect, it } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
-import { ArtistLinks } from "./ArtistLinks";
-
-it("renders each legacy collaboration credit as its own artist button", () => {
-  const html = renderToStaticMarkup(<ArtistLinks artistString="Bayaan, Hasan Raheem & Rovalio" onNavigateArtist={() => {}} />);
-  expect(html.match(/<button/g)).toHaveLength(3);
-  expect(html).toContain('>Hasan Raheem</button>');
-  expect(html).toContain('>Rovalio</button>');
+import {it,expect,vi} from 'vitest';
+import type {ReactElement,ReactNode} from 'react';
+const lookup=vi.hoisted(()=>vi.fn());
+vi.mock('../../adapters/native',()=>({library:{lookupCatalog:lookup}}));
+import {ArtistLinks} from './ArtistLinks';
+import {renderToStaticMarkup} from 'react-dom/server';
+function button(node:ReactNode):ReactElement<any>|undefined{
+ if(!node||typeof node!=='object')return;
+ if(Array.isArray(node))return node.map(button).find(Boolean);
+ const element=node as ReactElement<any>;return element.type==='button'?element:button(element.props?.children);
+}
+it('opens the artist credited on the recording instead of a same-name artist',async()=>{
+ lookup.mockResolvedValue({id:'saavn:abcdefgh',artists:[{name:'Gini',id:'saavn:artist:20043211'}]});const navigate=vi.fn();
+ const link=button(ArtistLinks({artistString:'Gini',catalogId:'saavn:abcdefgh',onNavigateArtist:navigate}))!;
+ link.props.onClick({stopPropagation:vi.fn()});await Promise.resolve();await Promise.resolve();
+ expect(navigate).toHaveBeenCalledWith('saavn:artist:20043211');
 });
-
-it("keeps an authoritative structured group name intact, even without a provider ID", () => {
-  const html = renderToStaticMarkup(<ArtistLinks artists={[{ name: "Of Monsters & Men" }]} onNavigateArtist={() => {}} />);
-  expect(html.match(/<button/g)).toHaveLength(1);
-  expect(html).toContain('>Of Monsters &amp; Men</button>');
+it('does not guess between ambiguous same-name credits',async()=>{
+ lookup.mockResolvedValue({id:'saavn:abcdefgh',artists:[{name:'Gini',id:'saavn:artist:1'},{name:'Gini',id:'saavn:artist:2'}]});const navigate=vi.fn();
+ button(ArtistLinks({artistString:'Gini',catalogId:'saavn:abcdefgh',onNavigateArtist:navigate}))!.props.onClick({stopPropagation:vi.fn()});await Promise.resolve();await Promise.resolve();
+ expect(navigate).toHaveBeenCalledWith('saavn:artist:name:Gini');
 });
-
-it("caps the number of rendered artists when maxArtists is provided", () => {
-  const html = renderToStaticMarkup(<ArtistLinks artistString="Sai Abhyankkar, Harini, Karthik Netha" onNavigateArtist={() => {}} maxArtists={2} />);
-  expect(html.match(/<button/g)).toHaveLength(2);
-  expect(html).toContain('>Sai Abhyankkar</button>');
-  expect(html).toContain('>Harini</button>');
-  expect(html).not.toContain('>Karthik Netha</button>');
-  expect(html).toContain('…');
-});
-
-
-it("does not reuse a collaboration provider ID for individual artist links", () => {
-  const html = renderToStaticMarkup(<ArtistLinks artists={[{ id: "saavn:artist:42", name: "Hasan Raheem and Abdullah" }]} onNavigateArtist={() => {}} />);
-  expect(html.match(/<button/g)).toHaveLength(2);
-  expect(html).toContain(">Hasan Raheem</button>");
-  expect(html).toContain(">Abdullah</button>");
+it('preserves same-name provider IDs and structured band names',()=>{
+ const navigate=vi.fn();
+ const html=renderToStaticMarkup(ArtistLinks({artists:[{name:'Gini',id:'saavn:artist:1'},{name:'Gini',id:'saavn:artist:2'}],onNavigateArtist:navigate}));
+ expect(html.match(/<button/g)).toHaveLength(2);
+ const joint=button(ArtistLinks({artists:[{name:'Earth, Wind and Fire',id:'saavn:artist:3'}],onNavigateArtist:navigate}))!;
+ expect(joint.props.children).toBe('Earth, Wind and Fire');
+ joint.props.onClick({stopPropagation:vi.fn()});
+ expect(navigate).toHaveBeenCalledWith('saavn:artist:3');
 });

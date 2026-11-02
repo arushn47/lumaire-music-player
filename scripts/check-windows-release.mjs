@@ -25,7 +25,7 @@ export function validateManifest(manifest, version, signature, tag, filename) {
   const platform = manifest.platforms['windows-x86_64'];
   assert(platform, 'Missing windows-x86_64 updater platform.');
   assert.equal(platform.signature.trim(), signature.trim(), 'Manifest must contain the actual signature, not a path.');
-  assert.equal(platform.url, `https://github.com/arushn47/music-player/releases/download/${tag}/${filename}`, 'Manifest URL must match the actual published payload.');
+  assert.equal(platform.url, `https://github.com/arushn47/lumaire-music-player/releases/download/${tag}/${filename}`, 'Manifest URL must match the actual published payload.');
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

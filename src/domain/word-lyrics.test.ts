@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { parseLyrics, wordProgress, activeLine, normalizeCachedLyrics, synchronizedLyrics } from "./lyrics";
+import { parseLyrics, wordProgress, activeLine, normalizeCachedLyrics, synchronizedLyrics, lyricsVersionMatches } from "./lyrics";
 
 describe("genuine Enhanced LRC", () => {
+  it('does not reuse provider lyrics from another version but preserves explicitly imported originals',()=>{
+    const doc=parseLyrics('[00:01]Fixture');
+    doc.source={provider:'lrclib',recordId:1,title:'Despacito (feat. Justin Bieber) [Remix]',artist:'Luis Fonsi',duration:230};
+    expect(lyricsVersionMatches(doc,'Despacito')).toBe(false);
+    expect(lyricsVersionMatches(doc,'Despacito [Remix]')).toBe(true);
+    expect(lyricsVersionMatches({...doc,origin:'imported'},'Despacito')).toBe(true);
+  });
+  it('validates provider file offsets and word endings without changing manual offsets',()=>{
+    const doc=parseLyrics('[offset:3000]\n[00:09.500]Fixture');
+    doc.source={provider:'lrclib',recordId:1,title:'Fixture',artist:'Artist',duration:10};
+    expect(synchronizedLyrics(doc,10)).toBe(false);
+    expect(synchronizedLyrics({...doc,fileOffset:0,userOffset:3000},10)).toBe(true);
+    expect(synchronizedLyrics({...doc,fileOffset:0,source:{...doc.source,duration:NaN}},10)).toBe(false);
+    const words=parseLyrics('[00:01]<00:01>Fixture<00:13>');words.source=doc.source;
+    expect(synchronizedLyrics(words,10)).toBe(false);
+  });
   it("keeps word timestamps when a second vocal line starts before the first ends", () => {
     const doc = parseLyrics("[01:01.74]<01:01.74>Main <01:02.28>voice <01:05.37>continues<01:06.06>\n[01:05.89]<01:05.89>Backing <01:06.25>voice<01:07.40>");
     expect(doc.lines[0].words).toHaveLength(3);

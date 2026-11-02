@@ -1,6 +1,8 @@
 import { useTaskbarControls } from "./useTaskbarControls";
 import { useEffect, useRef, useState } from "react";
-import { mobile, type CatalogTrack } from "../adapters/native";
+import { library, mobile, type CatalogTrack, type YtdlpSearchResult } from "../adapters/native";
+import { canonicalTrack } from '../domain/catalog-track';
+import { matchSource } from '../domain/source-matching';
 import { autoplayCandidates, resolveAutoplayCandidate } from '../domain/autoplay';
 import { loadAutoplayPool } from '../adapters/autoplay';
 import { discoveryPreferences } from '../adapters/discovery-home';
@@ -22,6 +24,7 @@ import type { Playback } from "../player/controller";
 import { player, playbackTracks, prepareCatalogCandidate } from "../player/service";
 import { playbackEvent } from "../player/diagnostics";
 import { checkpointListening } from '../domain/home-listening';
+import { nativeListeningHandoff } from '../player/listening-service';
 
 export interface UsePlaybackOptions {
   resolveQueuedTrack: (track: Track) => Promise<Track>;
@@ -95,8 +98,25 @@ export function usePlayback({
 
   // Subscribe to playback changes
   useEffect(() => {
-    return player.subscribe(setPlayback);
+    return player.subscribe(state => {
+      const native = state.nativeQueue;
+      if (mobile && native && (native.epoch !== sessionRef.current.nativeQueueEpoch || native.revision > (sessionRef.current.nativeQueueRevision ?? -1))) {
+        Object.values(native.session.queueTracks).forEach(track => playbackTracks.set(track.id, track));
+        update(s => ({ ...s, queue: native.session.queue, queueTracks: native.session.queueTracks,
+          currentId: native.session.currentId, shuffleOrder: native.session.shuffleOrder, position: state.time,
+          nativeQueueRevision: native.revision, nativeQueueEpoch: native.epoch }));
+      }
+      setPlayback(state);
+    });
   }, []);
+
+  useEffect(() => {
+    if (!mobile || !('handoffQueue' in player) || (!['playing', 'paused', 'buffering'].includes(playback.status) && !(playback.status === 'loading' && playback.nativeQueue))) return;
+    const entry = session.queue.find(item => item.id === session.currentId);
+    if (!entry || entry.trackId !== playback.trackId) return;
+    void player.handoffQueue({ session, tracks, records: listeningRecords, languages: discoveryPreferences().languages, listening:nativeListeningHandoff() }, playback.nativeQueueRevision ?? 0)
+      .catch(error => console.warn('Background queue handoff failed', String(error)));
+  }, [session, tracks, listeningRecords, playback.trackId, playback.status, playback.nativeQueueRevision]);
 
   useEffect(() => {
     let checkpoint = 0;
@@ -112,6 +132,7 @@ export function usePlayback({
   }, []);
 
   useEffect(() => {
+    if (mobile && playback.nativeQueue) return;
     if (playback.status === "playing") failedQueueItems.current.clear();
     if (playback.status !== "error" || !playback.autoplay) return;
     const current = sessionRef.current.queue.find(entry => entry.id === sessionRef.current.currentId);
@@ -192,6 +213,7 @@ export function usePlayback({
   }, [session.settings.autoplay, playback.status, session.currentId, session.queue]);
 
   async function continueAutoplay() {
+    if (mobile && player.state.nativeQueue) return;
     if (autoplayPending.current || !sessionRef.current.settings.autoplay) return;
     const initial = sessionRef.current;
     const current = initial.queue.find(entry => entry.id === initial.currentId);
@@ -453,6 +475,10 @@ export function usePlayback({
   }
 
   async function loadQueuedTrack(entry: QueueItem, autoplay: boolean, selected?: Track, position = 0) {
+    if (mobile && 'startQueue' in player) {
+      await player.startQueue({session:{...sessionRef.current,currentId:entry.id,position},tracks:tracksRef.current,records:recordsRef.current,languages:discoveryPreferences().languages,listening:nativeListeningHandoff(true)},autoplay,position);
+      return;
+    }
     const track = selected || tracksRef.current.find(t => t.id === entry.trackId) || sessionRef.current.queueTracks[entry.trackId];
     if (!track || !isQueuedCatalog(track)) { void player.load(entry.trackId, autoplay, position); return; }
     const token = player.beginLoading(track.id, autoplay, position);
@@ -484,8 +510,32 @@ export function usePlayback({
         tracksRef.current.some((saved) => saved.id === t.id),
       ),
     );
-    void player.load(t.id, true);
+    if (mobile) {
+      const entry = sessionRef.current.queue.find(item => item.id === sessionRef.current.currentId);
+      if (entry) void loadQueuedTrack(entry, true, t);
+    } else void player.load(t.id, true);
     if (onSetFollow) onSetFollow(true);
+  }
+
+  async function chooseRecording(catalog: CatalogTrack, source: YtdlpSearchResult, entryId: string) {
+    const before = sessionRef.current.queue.find(item => item.id === entryId);
+    if (!before || sessionRef.current.currentId !== entryId) throw Error('Playback selection changed.');
+    const old = tracksRef.current.find(item => item.id === before.trackId) || sessionRef.current.queueTracks[before.trackId];
+    if (!old || old.offline || (!isQueuedCatalog(old) && !old.id.startsWith('youtube:')) || old.metadataSourceId !== catalog.id) throw Error('Playback selection changed.');
+    const playbackId = player.state.playbackId;
+    const candidate = {...source,...await prepareCatalogCandidate(source)};
+    if (!(await matchSource(catalog,candidate)).accepted) throw Error('This recording no longer matches the selected song.');
+    if (player.state.playbackId !== playbackId || sessionRef.current.currentId !== entryId) throw Error('Playback selection changed.');
+    await library.setVerifiedSource(catalog.id,{sourceId:candidate.id,sourceProvider:'youtube',title:candidate.title,artist:candidate.channel,duration:candidate.duration,userSelected:true});
+    if (player.state.playbackId !== playbackId || sessionRef.current.currentId !== entryId) return;
+    const position = player.state.time;
+    const autoplay = player.state.status === 'playing' || player.state.status === 'buffering' || (['loading','error'].includes(player.state.status) && !!player.state.autoplay);
+    const resolved = canonicalTrack(catalog,candidate);
+    playbackTracks.set(resolved.id,resolved);
+    // Replace only this occurrence; saved tracks, favorites, downloads and other queue entries retain their identities.
+    update(s=>({...s,queue:s.queue.map(item=>item.id===entryId?{...item,trackId:resolved.id}:item),queueTracks:{...s.queueTracks,[resolved.id]:resolved},position}));
+    const entry = sessionRef.current.queue.find(item=>item.id===entryId);
+    if (entry) await loadQueuedTrack(entry,autoplay,resolved,position);
   }
 
   function playCollectionTrack(collectionTracks: Track[], startIndex: number, shuffle = sessionRef.current.settings.shuffle) {
@@ -632,6 +682,7 @@ export function usePlayback({
     setUndo,
     selectQueue,
     playTrack,
+    chooseRecording,
     playCollectionTrack,
     resumeListening,
     togglePlay,

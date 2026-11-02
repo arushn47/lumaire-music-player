@@ -8,6 +8,12 @@ const MAX_AGE = 6 * 60 * 60 * 1000;
 const pending = new Map<string, Promise<HomeAlbums>>();
 export interface HomeAlbums { albums: CatalogAlbum[]; updatedAt: number }
 
+export function featuredAlbum(albums: CatalogAlbum[], now = new Date()): CatalogAlbum | undefined {
+  const available = [...new Map(albums.map(album => [album.id, album])).values()].sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0);
+  const day = Math.floor(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()) / 86400000);
+  return available.length ? available[day % available.length] : undefined;
+}
+
 function read(key: string): unknown {
   try { return JSON.parse(localStorage.getItem(key) || "null"); } catch { return null; }
 }

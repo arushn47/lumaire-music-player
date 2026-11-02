@@ -1,15 +1,17 @@
-import { AmbientBackground } from "../common/AmbientBackground";
+
+import { createPortal } from "react-dom";
 import { cloneElement, useEffect, useRef, useState, type ReactNode, type ReactElement } from "react";
-import { X, FileText, Volume2, VolumeX, RefreshCw, Maximize2, Minimize2 } from "lucide-react";
+import { X, FileText, Volume2, VolumeX, RefreshCw, Maximize2, Minimize2, Ellipsis } from "lucide-react";
 import { centerLyricLine } from "../lyrics/scroll-lyric";
 import { Artwork } from "../common/Artwork";
-import { type PlayerBarProps } from "./PlayerBar";
+import { CloseTrackMenu } from "../common/CloseTrackMenu";
+import { type PlayerBarProps, TrackActionMenuItems } from "./PlayerBar";
 import type { LyricDocument, Preferences, Session } from "../../domain/types";
 import type { LyricProcessingState } from "../../adapters/lyric-processing";
 import "./expanded.css";
 import "./immersive.css";
 import { ImmersiveBackground } from "./ImmersiveBackground";
-import { Select } from "../common/Select";
+
 
 export function ExpandedPlayer({
   controls,
@@ -44,10 +46,11 @@ export function ExpandedPlayer({
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [showLyrics, setShowLyrics] = useState(true);
+  const [progressIdle, setProgressIdle] = useState(false);
   const session = propSession ?? controls.props.session;
   const onSetting = propOnSetting ?? controls.props.onSetting;
-  const immersive = session.settings.fullscreenLayout !== "minimal";
-  const visibleLyrics = showLyrics && (!immersive || Boolean(doc?.lines.some(line => line.text.trim()) && !doc.instrumental));
+
+  const visibleLyrics = showLyrics && Boolean(doc?.lines.some(line => line.text.trim()) && !doc.instrumental);
   const isFullscreen = propIsFullscreen ?? controls.props.isFullscreen;
   const onToggleFullscreen = propOnToggleFullscreen ?? controls.props.onToggleFullscreen;
   const sessionVolume = session?.settings?.volume ?? 0.72;
@@ -84,17 +87,48 @@ export function ExpandedPlayer({
   const isPlaying = controls.props.playback?.status === "playing";
   const track = controls.props.track;
 
-  return (
+  useEffect(() => {
+    setProgressIdle(false);
+    if (!isPlaying) return;
+    const element = dialog.current!;
+    let timer: ReturnType<typeof setTimeout>;
+    let pressed = false;
+    const wake = () => {
+      setProgressIdle(false);
+      clearTimeout(timer);
+      timer = setTimeout(() => { if (!pressed) setProgressIdle(true); }, 3000);
+    };
+    const press = () => { pressed = true; wake(); };
+    const release = () => { pressed = false; wake(); };
+    element.addEventListener("pointermove", wake);
+    element.addEventListener("pointerdown", press);
+    element.addEventListener("keydown", wake);
+    element.addEventListener("focusin", wake);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    wake();
+    return () => {
+      clearTimeout(timer);
+      element.removeEventListener("pointermove", wake);
+      element.removeEventListener("pointerdown", press);
+      element.removeEventListener("keydown", wake);
+      element.removeEventListener("focusin", wake);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+    };
+  }, [isPlaying]);
+
+  const content = (
     <dialog
       ref={dialog}
-      className={`expanded-player ${immersive ? "is-immersive" : "is-minimal"}`}
+      className={`expanded-player is-immersive${isPlaying && progressIdle ? " is-progress-idle" : ""}`}
       aria-label="Now playing"
       onCancel={(event) => {
         event.preventDefault();
         onClose();
       }}
     >
-      {immersive ? <ImmersiveBackground track={track} /> : <AmbientBackground artwork={track?.artworkUrl} />}
+      <ImmersiveBackground track={track} />
 
       <header className="expanded-top-bar">
         <button
@@ -103,14 +137,14 @@ export function ExpandedPlayer({
           aria-label="Close expanded player"
           onClick={onClose}
         >
-          <X size={20} />
+          <X size={17} />
         </button>
 
         <div className="expanded-top-actions">
-          <Select ariaLabel="Fullscreen layout" className="fullscreen-layout-select" placement="down"
-            value={immersive ? "immersive" : "minimal"}
-            onChange={value => onSetting("fullscreenLayout", value)}
-            options={[{value: "immersive", label: "Immersive"}, {value: "minimal", label: "Minimal"}]} />
+
+
+
+
           <div id="expanded-lyrics-settings-slot" />
         </div>
       </header>
@@ -122,8 +156,9 @@ export function ExpandedPlayer({
           </div>
           {cloneElement(controls, {
             expanded: true,
-            titleCharacterLimit: immersive ? 40 : undefined,
+            titleCharacterLimit: visibleLyrics ? 28 : 42,
             onExpand: undefined,
+            noLyrics: !visibleLyrics,
             onNavigateArtist: (id) => {
               onClose();
               controls.props.onNavigateArtist?.(id);
@@ -213,6 +248,35 @@ export function ExpandedPlayer({
           />
         </div>
 
+        {track && (track.format !== "catalog" || controls.props.onWrongVersion) && (
+          <details className="track-menu expanded-track-menu">
+            <summary
+              className="expanded-action-btn"
+              aria-label="Current song actions"
+              title="Song actions"
+            >
+              <Ellipsis size={17} aria-hidden="true" />
+            </summary>
+            <div className="menu-popover">
+              <CloseTrackMenu />
+              <TrackActionMenuItems
+                onWrongVersion={controls.props.onWrongVersion}
+                track={track}
+                tracks={controls.props.tracks || []}
+                busy={controls.props.busy}
+                session={session}
+                downloads={controls.props.downloads || {}}
+                onSaveOnline={controls.props.onSaveOnline}
+                onChoosePlaylist={controls.props.onChoosePlaylist}
+                onFavorite={controls.props.onFavorite}
+                onCancelDownload={controls.props.onCancelDownload}
+                onDownloadTrack={controls.props.onDownloadTrack}
+                onDeleteOffline={controls.props.onDeleteOffline}
+              />
+            </div>
+          </details>
+        )}
+
         {onToggleFullscreen && (
           <button
             type="button"
@@ -227,5 +291,6 @@ export function ExpandedPlayer({
       </div>
     </dialog>
   );
+  return typeof document === "undefined" ? content : createPortal(content, document.body);
 }
 

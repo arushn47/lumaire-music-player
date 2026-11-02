@@ -30,6 +30,7 @@ describe("platform-specific online resolution", () => {
     expect(bridge.invoke).toHaveBeenCalledTimes(1);
     bridge.invoke.mockRejectedValueOnce(Error("Offline"));
     await expect(library.lookupArtist("itunes:99")).rejects.toThrow("Offline");
+    bridge.invoke.mockResolvedValue({ info: { id: "itunes:99", name: "Artist" } });
     await library.lookupArtist("itunes:99");
     expect(bridge.invoke).toHaveBeenCalledTimes(3);
   });

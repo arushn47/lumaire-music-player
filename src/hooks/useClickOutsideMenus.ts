@@ -13,7 +13,7 @@ export function initClickOutsideMenus(doc: Document = document): () => void {
   let suppressClick = false;
   let sheet: HTMLDetailsElement | null = null;
   let consumeBack = false;
-  const phone = () => doc.defaultView?.matchMedia("(max-width: 768px)").matches;
+  const phone = () => doc.defaultView?.matchMedia("(max-width: 768px), (pointer: coarse)").matches;
   const cancelHold = () => { clearTimeout(holdTimer); heldPointer = null; };
   const handlePointerDown = (e: PointerEvent) => {
     const target = e.target as Node | null;
@@ -32,7 +32,7 @@ export function initClickOutsideMenus(doc: Document = document): () => void {
     if (e.pointerType !== "touch" || !(target as Element).closest) return;
     const element = target as Element;
     if (element.closest(".track-actions, summary, .menu-popover, input")) return;
-    heldMenu = element.closest(".track-row")?.querySelector("details.track-menu") ?? null;
+    heldMenu = (element.closest(".track-row") || element.closest(".recent-track-item") || element.closest(".discover-album-card") || element.closest(".topbar-search-option"))?.querySelector("details.track-menu") ?? null;
     if (!heldMenu) return;
     heldPointer = { x: e.clientX, y: e.clientY };
     holdTimer = setTimeout(() => { if (heldMenu) { heldMenu.open = true; suppressClick = true; } }, 450);
@@ -45,7 +45,47 @@ export function initClickOutsideMenus(doc: Document = document): () => void {
     if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); suppressClick = false; }
   };
   const handleContextMenu = (event: MouseEvent) => {
-    if (phone() && (event.target as Element)?.closest?.(".track-row")) event.preventDefault();
+    const target = event.target as Element | null;
+    if (!target?.closest) return;
+    const searchDropdown = target.closest(".topbar-search-dropdown");
+    const el = target.closest(".track-row") || target.closest(".recent-track-item") || target.closest(".discover-album-card") || target.closest(".topbar-search-option");
+    if (!el) {
+      if (searchDropdown) event.preventDefault();
+      return;
+    }
+    if (phone()) {
+      event.preventDefault();
+      return;
+    }
+    const menu = el.querySelector<HTMLDetailsElement>("details.track-menu");
+    if (menu) {
+      event.preventDefault();
+      doc.querySelectorAll<HTMLDetailsElement>("details.track-menu[open]").forEach(m => {
+        if (m !== menu) m.open = false;
+      });
+      menu.open = true;
+      const popover = menu.querySelector<HTMLElement>(".menu-popover");
+      const win = doc.defaultView || (typeof window !== "undefined" ? window : null);
+      if (popover && win) {
+        const pad = 8;
+        const rect = popover.getBoundingClientRect ? popover.getBoundingClientRect() : { width: 215, height: 220 };
+        const width = rect.width || 215;
+        const height = rect.height || 220;
+        let x = event.clientX;
+        let y = event.clientY;
+        const winWidth = win.innerWidth || 1024;
+        const winHeight = win.innerHeight || 768;
+        if (x + width > winWidth - pad) {
+          x = Math.max(pad, winWidth - width - pad);
+        }
+        if (y + height > winHeight - pad) {
+          y = Math.max(pad, event.clientY - height);
+        }
+        popover.style.position = "fixed";
+        popover.style.left = `${Math.round(x)}px`;
+        popover.style.top = `${Math.round(y)}px`;
+      }
+    }
   };
 
   const handleClick = (e: MouseEvent) => {
@@ -62,6 +102,18 @@ export function initClickOutsideMenus(doc: Document = document): () => void {
   };
 
   const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "ContextMenu" || (e.key === "F10" && e.shiftKey)) {
+      const target = e.target as HTMLElement | null;
+      const row = target?.closest?.(".track-row, .recent-track-item, .discover-album-card, .topbar-search-option");
+      const menu = row?.querySelector<HTMLDetailsElement>("details.track-menu");
+      if (row && menu) {
+        e.preventDefault();
+        const rect = row.getBoundingClientRect();
+        if (phone()) menu.open = true;
+        else handleContextMenu({ target, clientX: rect.left, clientY: rect.bottom, preventDefault: () => e.preventDefault() } as unknown as MouseEvent);
+        menu.querySelector<HTMLElement>(".menu-popover button:not(.mobile-actions-close):not(:disabled), .menu-popover a")?.focus();
+      }
+    }
     if (e.key === "Tab" && sheet) {
       const items = sheet.querySelectorAll<HTMLButtonElement>(".menu-popover button:not(:disabled), .menu-popover a");
       const first = items[0], last = items[items.length - 1];
@@ -84,6 +136,12 @@ export function initClickOutsideMenus(doc: Document = document): () => void {
     const menu = target?.closest ? target.closest<HTMLDetailsElement>("details.track-menu") : null;
     if (!menu) return;
     if (!menu.open) {
+      const popover = menu.querySelector<HTMLElement>(".menu-popover");
+      if (popover && popover.style.position === "fixed") {
+        popover.style.position = "";
+        popover.style.left = "";
+        popover.style.top = "";
+      }
       if (sheet === menu) {
         sheet = null;
         menu.querySelector<HTMLElement>("summary")?.focus();

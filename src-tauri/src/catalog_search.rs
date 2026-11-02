@@ -100,6 +100,9 @@ fn usable(query: &str, track: &CatalogTrack) -> bool {
     !["original sound", "unknown artist", "ringtone"].iter().any(|label| artist.contains(label)) && !versions.find_iter(&track.title).any(|version| !lyric_identity::fingerprint(query).contains(&lyric_identity::fingerprint(version.as_str())))
 }
 pub(crate) fn merge_songs(query: &str, primary: Vec<CatalogTrack>, secondary: Vec<CatalogTrack>, limit: usize) -> Vec<CatalogTrack> {
+    rank_songs(query, primary, secondary, limit, true)
+}
+fn rank_songs(query: &str, primary: Vec<CatalogTrack>, secondary: Vec<CatalogTrack>, limit: usize, deduplicate: bool) -> Vec<CatalogTrack> {
     let rank = |tracks: Vec<CatalogTrack>| tracks.into_iter().enumerate().map(|(index, track)| {
         let keyword = relevance(query, &track.title, &track.artist);
         let keyword_score = keyword * 1000;
@@ -112,7 +115,7 @@ pub(crate) fn merge_songs(query: &str, primary: Vec<CatalogTrack>, secondary: Ve
     for (track, keyword, score) in rank(primary).chain(rank(secondary)).filter(|(track, keyword, _)| usable(query, track) && *keyword > 0) {
         let _ = keyword;
         // Keep a provider's distinct release visible instead of replacing it with another provider's compilation.
-        if let Some((old, old_score)) = result.iter_mut().find(|(old, _)| same_recording(old, &track)
+        if let Some((old, old_score)) = result.iter_mut().find(|(old, _)| deduplicate && same_recording(old, &track)
             && (old.id.split(':').next() == track.id.split(':').next()
                 || lyric_identity::fingerprint(&old.album) == lyric_identity::fingerprint(&track.album))) {
             *old_score = (*old_score).max(score);
@@ -125,7 +128,13 @@ pub(crate) fn merge_songs(query: &str, primary: Vec<CatalogTrack>, secondary: Ve
     result.into_iter().take(limit).map(|(track, _)| track).collect()
 }
 pub async fn search(query: &str, limit: usize) -> Result<Vec<CatalogTrack>, String> {
-    let key = format!("songs:{}", query.trim().to_lowercase());
+    search_results(query, limit, false).await
+}
+pub async fn search_records(query: &str, limit: usize) -> Result<Vec<CatalogTrack>, String> {
+    search_results(query, limit, true).await
+}
+async fn search_results(query: &str, limit: usize, retain_records: bool) -> Result<Vec<CatalogTrack>, String> {
+    let key = format!("{}:{}", if retain_records { "song-records" } else { "songs" }, query.trim().to_lowercase());
     let _guard = flight(&key).await;
     if let Some(Value::Songs(mut rows)) = cached(&key) { rows.truncate(limit); return Ok(rows); }
     let (saavn, apple, brainz) = tokio::join!(bounded(6, catalog::search_from(SAAVN, query, 30)), bounded(10, itunes_metadata::search_catalog(query.into(), Some(60))), bounded(4, crate::brainz_catalog::search(query)));
@@ -134,8 +143,9 @@ pub async fn search(query: &str, limit: usize) -> Result<Vec<CatalogTrack>, Stri
         return Err("Both catalog providers are unavailable. Direct YouTube search is still separate; retry the catalog shortly.".into());
     }
     let complete = saavn.is_ok() && apple.is_ok() && brainz.is_ok();
-    let rows = merge_songs(query, saavn.unwrap_or_default(), apple.unwrap_or_default(), 60);
-    let mut rows = merge_songs(query, rows, brainz.unwrap_or_default(), 60);
+    let merge = |a,b| if retain_records { rank_songs(query,a,b,60,false) } else { merge_songs(query,a,b,60) };
+    let rows = merge(saavn.unwrap_or_default(), apple.unwrap_or_default());
+    let mut rows = merge(rows, brainz.unwrap_or_default());
     save(&key, Value::Songs(rows.clone()), complete && !rows.is_empty());
     rows.truncate(limit); Ok(rows)
 }
@@ -150,45 +160,162 @@ fn merge_albums(primary: Vec<CatalogAlbum>, secondary: Vec<CatalogAlbum>) -> Vec
 fn credited_artists(candidates: Vec<CatalogArtist>, mut credited: Vec<CatalogArtist>) -> Vec<CatalogArtist> {
     // Artist search also returns empty publishing entities; require a performing credit on a returned song.
     for artist in &mut credited {
-        if artist.id.contains(":name:") {
-            let matches: Vec<_> = candidates.iter().filter(|candidate| !candidate.id.contains(":name:") && catalog::same_name(&candidate.name, &artist.name)).collect();
-            if matches.len() == 1 {
-                artist.id = matches[0].id.clone();
-                artist.name = matches[0].name.clone();
-            }
-        }
         if artist.artwork_url.is_none() {
             artist.artwork_url = candidates.iter().find(|candidate| candidate.id == artist.id).and_then(|candidate| candidate.artwork_url.clone());
         }
     }
-    let resolved:Vec<_>=credited.iter().filter(|artist|!artist.id.contains(":name:")).map(|artist|artist.name.to_lowercase()).collect();
     let mut seen=std::collections::HashSet::new();
-    credited.retain(|artist|(!artist.id.contains(":name:")||!resolved.contains(&artist.name.to_lowercase()))&&seen.insert(artist.id.clone()));
+    credited.retain(|artist|catalog::valid_artist_id(&artist.id)&&seen.insert(artist.id.clone()));
     credited
 }
 
-fn group_artist_recordings(artists: &mut Vec<CatalogArtist>, tracks: &[CatalogTrack]) {
-    let mut remove = std::collections::HashSet::new();
-    for apple in artists.iter().filter(|artist| artist.id.starts_with("itunes:")) {
-        let matches: Vec<_> = artists.iter().filter(|other| other.id.starts_with("saavn:artist:") && catalog::same_name(&apple.name, &other.name)).filter(|other| {
-            let credited = |track: &&CatalogTrack, id: &str| track.artists.iter().any(|credit| credit.id.as_deref() == Some(id));
-            let mut recordings: Vec<&CatalogTrack> = Vec::new();
-            for track in tracks.iter().filter(|track| credited(track, &apple.id)) {
-                if tracks.iter().filter(|candidate| credited(candidate, &other.id)).any(|candidate| same_recording(track, candidate))
-                    && !recordings.iter().any(|old| same_recording(old, track)) { recordings.push(track); }
-            }
-            // shortcut: two strict recording overlaps prove grouping; sparse catalogues remain separate.
-            recordings.len() >= 2
-        }).collect();
-        if matches.len() == 1 { remove.insert(apple.id.clone()); }
+fn recordings(profile: &ArtistDetails) -> &[CatalogTrack] {
+    if profile.evidence.is_empty() { &profile.top_tracks } else { &profile.evidence }
+}
+
+fn artist_overlap(a: &ArtistDetails, b: &ArtistDetails) -> bool {
+    let owned = |track: &CatalogTrack, id: &str| track.artists.iter().any(|credit| credit.id.as_deref()==Some(id));
+    let mut matches: Vec<&CatalogTrack> = vec![];
+    let mut other_releases=std::collections::HashSet::new();
+    for track in recordings(a).iter().filter(|track|owned(track,&a.info.id)) {
+        if matches.iter().any(|old|same_recording(old,track)){continue;}
+        if let Some(other)=recordings(b).iter().filter(|other|owned(other,&b.info.id)).find(|other|same_recording(track,other)) {
+            matches.push(track);
+            if let Some(id)=&other.album_id{other_releases.insert(id);}
+        }
     }
-    artists.retain(|artist| !remove.contains(&artist.id));
+    let releases: std::collections::HashSet<_> = matches.iter().filter_map(|track|track.album_id.as_ref()).collect();
+    let solo=matches.iter().filter(|track|track.artists.len()==1).count();
+    let collaborators: std::collections::HashSet<_>=matches.iter().filter(|track|track.artists.len()>1).map(|track|{let mut names=credits(track);names.sort();names}).collect();
+    // Independent releases and multiple credit contexts corroborate recording overlap; names alone never qualify.
+    matches.len()>=3 && releases.len()>=3 && other_releases.len()>=3 && (solo>=2 || collaborators.len()>=2)
+}
+
+fn unify_artists(artists: &mut Vec<CatalogArtist>, proofs: &[ArtistDetails]) {
+    for apple in proofs.iter().filter(|row|row.info.id.starts_with("itunes:")) {
+        let candidates: Vec<_>=proofs.iter().filter(|row|row.info.id.starts_with("saavn:")&&catalog::same_name(&row.info.name,&apple.info.name)&&artist_overlap(row,apple)).collect();
+        if candidates.len()!=1 {continue;}
+        let saavn=candidates[0];
+        if proofs.iter().filter(|row|row.info.id.starts_with("itunes:")&&catalog::same_name(&row.info.name,&saavn.info.name)&&artist_overlap(saavn,row)).count()!=1 {continue;}
+        let mut merged=saavn.clone();
+        merged.verified_ids=vec![saavn.info.id.clone(),apple.info.id.clone()];
+        if merged.info.artwork_url.is_none(){merged.info.artwork_url=apple.info.artwork_url.clone();}
+        // Keep every release/recording ID and its original credits, including collaborations.
+        merged.top_tracks = recordings(saavn).to_vec();
+        for track in recordings(apple) {if !merged.top_tracks.iter().any(|old|old.id==track.id){merged.top_tracks.push(track.clone());}}
+        for album in &apple.albums {if !merged.albums.iter().any(|old|old.id==album.id){merged.albums.push(album.clone());}}
+        for id in &merged.verified_ids {save(&format!("artist:{id}"),Value::Artist(merged.clone()),true);}
+        artists.retain(|row|row.id!=apple.info.id);
+    }
+}
+
+fn mapped_artist_cards(artists: &mut Vec<CatalogArtist>) {
+    for artist in artists.iter_mut() {
+        if let Some(Value::Artist(profile))=cached(&format!("artist:{}",artist.id)) {
+            if profile.verified_ids.contains(&artist.id){*artist=profile.info;}
+        }
+    }
+    let mut seen=std::collections::HashSet::new();
+    artists.retain(|artist|seen.insert(artist.id.clone()));
+}
+
+fn verification_candidates(artists: &[CatalogArtist]) -> Vec<CatalogArtist> {
+    let mut selected = Vec::new();
+    let mut pairs = 0;
+    let mut names = std::collections::HashSet::new();
+    for artist in artists {
+        if !names.insert(lyric_identity::fingerprint(&artist.name)) { continue; }
+        let group: Vec<_> = artists.iter().filter(|row| catalog::same_name(&row.name, &artist.name)).collect();
+        let saavn = group.iter().filter(|row| row.id.starts_with("saavn:artist:")).count();
+        let apple = group.iter().filter(|row| row.id.starts_with("itunes:")).count();
+        let count = saavn * apple;
+        // Skipping a whole ambiguous group is safer than proving only its first few pairs.
+        if count == 0 || pairs + count > 3 { continue; }
+        pairs += count;
+        selected.extend(group.into_iter().filter(|row| row.id.starts_with("saavn:artist:") || row.id.starts_with("itunes:")).cloned());
+    }
+    selected
+}
+
+fn verification_requests() -> &'static tokio::sync::Semaphore {
+    static REQUESTS: OnceLock<tokio::sync::Semaphore> = OnceLock::new();
+    REQUESTS.get_or_init(|| tokio::sync::Semaphore::new(2))
+}
+
+fn evidence_albums(profile: &ArtistDetails, proofs: &[ArtistDetails]) -> Vec<CatalogAlbum> {
+    let mut albums = profile.albums.clone();
+    let key = |value: &str| lyric_identity::fingerprint(&crate::music_metadata::album_title(value));
+    // Spend the three lookups on releases represented in the other provider's evidence.
+    // This chooses evidence to inspect; it never establishes recording or artist identity.
+    albums.sort_by_key(|album| std::cmp::Reverse(proofs.iter().filter(|other| other.info.id.starts_with("itunes:")).flat_map(recordings).filter(|track| {
+        let year = track.recording_metadata.as_ref().and_then(|metadata| metadata.release_date.as_deref()).and_then(|date|date.get(..4)).and_then(|year|year.parse::<u32>().ok());
+        let compatible_year = album.year.zip(year).is_none_or(|(left,right)|left.abs_diff(right)<=1);
+        compatible_year && (key(&track.album) == key(&album.title) || lyric_identity::title(&track.title) == lyric_identity::title(&album.title))
+    }).count()));
+    albums.truncate(3);
+    albums
+}
+
+async fn artist_proof(id: &str) -> Result<ArtistDetails, String> {
+    let key = format!("artist-proof:{id}");
+    let _guard = flight(&key).await;
+    if let Some(Value::Artist(value)) = cached(&key) { return Ok(value); }
+    let _permit = verification_requests().acquire().await.map_err(|e| e.to_string())?;
+    let value = if id.starts_with("itunes:") { itunes_metadata::lookup_artist(id.into()).await }
+        else { catalog::lookup_saavn_artist(SAAVN, id).await }?;
+    if value.info.id != id { return Err("Provider returned a different artist identity.".into()); }
+    save(&key, Value::Artist(value.clone()), true);
+    Ok(value)
+}
+
+pub(crate) async fn resolve_artists(query: &str, artists: &[CatalogArtist]) -> Vec<ArtistDetails> {
+    resolve_artists_until(query, artists, tokio::time::Instant::now() + Duration::from_secs(12)).await
+}
+
+async fn resolve_artists_until(query: &str, artists: &[CatalogArtist], deadline: tokio::time::Instant) -> Vec<ArtistDetails> {
+    let key = format!("artist-resolution:{}:{}", query.trim().to_lowercase(), artists.iter().map(|row| row.id.as_str()).collect::<Vec<_>>().join(","));
+    let Ok(_guard) = tokio::time::timeout_at(deadline, flight(&key)).await else { return vec![]; };
+    if cached(&key).is_some() {
+        return artists.iter().filter_map(|row| match cached(&format!("artist:{}",row.id)) { Some(Value::Artist(profile)) if profile.verified_ids.first()==Some(&row.id) => Some(profile), _ => None }).collect();
+    }
+    let candidates = verification_candidates(artists);
+    let work = async {
+        let mut checks = tokio::task::JoinSet::new();
+        for candidate in &candidates {
+            let id = candidate.id.clone();
+            checks.spawn(async move { artist_proof(&id).await });
+        }
+        let mut proofs = Vec::new();
+        while let Some(result) = checks.join_next().await {
+            // A missing candidate could be the other half of an ambiguous identity.
+            proofs.push(result.map_err(|e|e.to_string())??);
+        }
+        for index in 0..proofs.len() {
+            if !proofs[index].info.id.starts_with("saavn:") || proofs.iter().any(|other|other.info.id.starts_with("itunes:") && artist_overlap(&proofs[index],other)) { continue; }
+            let id = proofs[index].info.id.clone();
+            for release in evidence_albums(&proofs[index], &proofs) {
+                let _permit = verification_requests().acquire().await.map_err(|e|e.to_string())?;
+                let album = album(&release.id).await?;
+                for track in album.tracks.into_iter().filter(|track|track.artists.iter().any(|credit|credit.id.as_deref()==Some(&id))) {
+                    let evidence = &mut proofs[index].evidence;
+                    if evidence.len()<100 && !evidence.iter().any(|old|same_recording(old,&track)) { evidence.push(track); }
+                }
+            }
+            save(&format!("artist-proof:{id}"),Value::Artist(proofs[index].clone()),true);
+        }
+        let mut cards = candidates.clone();
+        unify_artists(&mut cards,&proofs);
+        Ok::<_, String>(())
+    };
+    let complete = matches!(tokio::time::timeout_at(deadline,work).await, Ok(Ok(())));
+    save(&key,Value::Entities(CatalogEntities{artists:vec![],albums:vec![],warning:None}),complete);
+    artists.iter().filter_map(|row|match cached(&format!("artist:{}",row.id)){Some(Value::Artist(profile)) if profile.verified_ids.first()==Some(&row.id)=>Some(profile),_=>None}).collect()
 }
 
 pub async fn entities(query: &str) -> Result<CatalogEntities, String> {
     let key = format!("entities:{}", query.trim().to_lowercase()); let _guard = flight(&key).await;
-    if let Some(Value::Entities(rows)) = cached(&key) { return Ok(rows); }
-    let (saavn, apple) = tokio::join!(bounded(6, catalog::search_entities_from(SAAVN, query)), bounded(11, async { Ok(itunes_metadata::entities_from_tracks(query, search(query, 60).await?)) }));
+    if let Some(Value::Entities(mut rows)) = cached(&key) { mapped_artist_cards(&mut rows.artists); return Ok(rows); }
+    let (saavn, apple, tracks) = tokio::join!(bounded(6, catalog::search_entities_from(SAAVN, query)), bounded(11, itunes_metadata::search_entities(query)), bounded(11, search(query, 60)));
     if saavn.is_err() && apple.is_err() {
         if let Some(Value::Entities(mut rows)) = stale(&key) { rows.warning = Some("Providers could not refresh. Showing cached catalog results.".into()); return Ok(rows); }
         return Err("Artist and album providers are temporarily unavailable.".into());
@@ -196,93 +323,254 @@ pub async fn entities(query: &str) -> Result<CatalogEntities, String> {
     let complete = saavn.is_ok() && apple.is_ok();
     let empty = || CatalogEntities { artists: vec![], albums: vec![], warning: None };
     let mut primary = saavn.unwrap_or_else(|_| empty()); let mut secondary = apple.unwrap_or_else(|_| empty());
-    // Same-name artists can be absent from the first song-search page; verify their own music instead.
-    let mut evidence = match cached(&format!("songs:{}", query.trim().to_lowercase())) { Some(Value::Songs(rows)) => rows, _ => vec![] };
-    let mut checks=tokio::task::JoinSet::new();
-    for candidate in primary.artists.iter().chain(secondary.artists.iter().filter(|artist|artist.id.starts_with("itunes:"))).filter(|artist|catalog::same_name(&artist.name,query)&&!artist.id.contains(":name:")).take(6) {
-        let id=candidate.id.clone();
-        checks.spawn(async move {
-            if let Some(Value::Artist(details)) = cached(&format!("artist-proof:{id}")) { return Ok(details); }
-            if id.starts_with("itunes:") { bounded(6,itunes_metadata::lookup_artist(id)).await }
-            else { bounded(6,catalog::lookup_saavn_artist(SAAVN,&id)).await }
-        });
-    }
-    while let Some(result)=checks.join_next().await {
-        if let Ok(Ok(details))=result {
-            save(&format!("artist-proof:{}",details.info.id),Value::Artist(details.clone()),true);
-            evidence.extend(details.top_tracks.clone());
-            secondary.artists.push(details.info.clone());
-            save(&format!("artist:{}",details.info.id),Value::Artist(details),true);
-        }
-    }
-    primary.artists = credited_artists(primary.artists, secondary.artists);
-    group_artist_recordings(&mut primary.artists, &evidence);
-    primary.artists.sort_by_key(|artist| std::cmp::Reverse(relevance(query, &artist.name, ""))); primary.artists.truncate(6);
+    secondary.artists.extend(itunes_metadata::entities_from_tracks(query, tracks.unwrap_or_default()).artists);
+    // Raw artist search includes collaboration/publishing entities without performing credits.
+    // Keep those as portrait candidates only; cards must come from actual recording credits.
+    primary.artists = credited_artists(primary.artists, secondary.artists.clone());
+    mapped_artist_cards(&mut primary.artists);
+    primary.artists.sort_by_key(|artist| (std::cmp::Reverse(relevance(query, &artist.name, "")),!artist.id.starts_with("saavn:")));
     primary.albums.retain(|album| relevance(query, &album.title, &album.artist) > 0);
     primary.albums = merge_albums(primary.albums, secondary.albums);
     primary.albums.sort_by_key(|album| std::cmp::Reverse(relevance(query, &album.title, &album.artist))); primary.albums.truncate(6);
     if !complete { primary.warning = Some("Some catalog providers could not refresh. Showing verified available results.".into()); }
     save(&key, Value::Entities(primary.clone()), complete); Ok(primary)
 }
-fn decoded_name(value: &str) -> Result<String, String> {
-    let name = urlencoding::decode(value).map_err(|_| "Invalid artist or album name encoding.")?.trim().to_string();
-    if !(1..=200).contains(&name.chars().count()) || name.chars().any(char::is_control) { return Err("Invalid artist or album name.".into()); }
-    Ok(name)
-}
-fn known_artist(id: &str) -> Option<String> {
-    CACHE.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap_or_else(|e| e.into_inner()).values().find_map(|(_, value)| match value {
-        Value::Entities(value) => value.artists.iter().find(|artist| artist.id == id).map(|artist| artist.name.clone()),
-        Value::Songs(rows) => rows.iter().flat_map(|track| &track.artists).find(|credit| credit.id.as_deref() == Some(id)).map(|credit| credit.name.clone()),
-        Value::Artist(value) if value.info.id == id => Some(value.info.name.clone()), _ => None,
-    })
-}
-fn known_album(id: &str) -> Option<(String, String)> {
-    CACHE.get_or_init(|| Mutex::new(HashMap::new())).lock().unwrap_or_else(|e| e.into_inner()).values().find_map(|(_, value)| {
-        let found = match value { Value::Entities(value) => value.albums.iter().find(|album| album.id == id), Value::Artist(value) => value.albums.iter().find(|album| album.id == id), Value::Album(value) if value.info.id == id => Some(&value.info), _ => None };
-        found.map(|album| (album.title.clone(), crate::lyric_identity::primary_artist(&album.artist)))
-    })
-}
 pub async fn artist(id: &str) -> Result<ArtistDetails, String> {
+    if !catalog::valid_artist_id(id) { return Err("Artist identity is unresolved. Search and select a provider artist result.".into()); }
     let key = format!("artist:{id}"); let _guard = flight(&key).await;
-    if let Some(Value::Artist(value)) = cached(&key) { return Ok(value); }
-    let name = id.strip_prefix("artist:name:").or_else(|| id.strip_prefix("saavn:artist:name:")).map(decoded_name).transpose()?.or_else(|| known_artist(id));
-    let saavn_id = if id.starts_with("artist:name:") { format!("saavn:artist:name:{}", urlencoding::encode(name.as_deref().unwrap_or(""))) } else { id.into() };
-    let primary = if id.starts_with("musicbrainz:") { bounded(12, crate::brainz_catalog::artist(id)).await } else if id.starts_with("itunes:") { bounded(12, itunes_metadata::lookup_artist(id.into())).await } else { bounded(6, catalog::lookup_saavn_artist(SAAVN, &saavn_id)).await };
-    let mut value = match primary {
+    if let Some(Value::Artist(value)) = cached(&key) { if value.info.id == id || value.verified_ids.iter().any(|alias|alias==id) { return Ok(value); } }
+    let primary = if id.starts_with("musicbrainz:") { bounded(12, crate::brainz_catalog::artist(id)).await } else if id.starts_with("itunes:") { bounded(12, itunes_metadata::lookup_artist(id.into())).await } else { bounded(6, catalog::lookup_saavn_artist(SAAVN, id)).await };
+    let value = match primary {
         Ok(value) => value,
-        Err(error) => match name {
-            Some(name) if id.starts_with("itunes:") => bounded(6, catalog::lookup_saavn_artist(SAAVN, &format!("saavn:artist:name:{}", urlencoding::encode(&name)))).await.map_err(|_| error)?,
-            Some(name) => bounded(15, itunes_metadata::named_artist(&name)).await.map_err(|_| error)?,
-            None => match stale(&key) { Some(Value::Artist(value)) => return Ok(value), _ => return Err(error) },
-        },
+        Err(error) => match stale(&key) { Some(Value::Artist(value)) if value.info.id == id || value.verified_ids.iter().any(|alias|alias==id) => return Ok(value), _ => return Err(error) },
     };
-    let mut complete = true;
-    if !value.info.id.starts_with("itunes:") {
-        if let Ok(extra) = bounded(4, itunes_metadata::named_artist(&value.info.name)).await {
-            value.top_tracks = merge_songs(&value.info.name, value.top_tracks, extra.top_tracks, 30);
-            value.albums = merge_albums(value.albums, extra.albums);
-            if value.info.artwork_url.is_none() { value.info.artwork_url = extra.info.artwork_url; }
-        } else { complete = false; }
-    }
-    save(&key, Value::Artist(value.clone()), complete); Ok(value)
+    if value.info.id != id { return Err("Provider returned a different artist identity.".into()); }
+    // The same evidence path serves direct credits as well as discovery; a failed proof leaves the original identity intact.
+    if let Ok(rows)=entities(&value.info.name).await { if rows.warning.is_none() { let _=resolve_artists(&value.info.name,&rows.artists).await; } }
+    if let Some(Value::Artist(merged))=cached(&key) {if merged.verified_ids.iter().any(|alias|alias==id){return Ok(merged);}}
+    save(&key, Value::Artist(value.clone()), true); Ok(value)
 }
 pub async fn album(id: &str) -> Result<AlbumDetails, String> {
     let key = format!("album:{id}"); let _guard = flight(&key).await;
-    if let Some(Value::Album(value)) = cached(&key) { return Ok(value); }
+    if let Some(Value::Album(value)) = cached(&key) { if value.info.id == id || id.starts_with("saavn:album:search:") { return Ok(value); } }
     let primary = if id.starts_with("musicbrainz:") { bounded(12, crate::brainz_catalog::album(id)).await } else if id.starts_with("itunes:") { bounded(12, itunes_metadata::lookup_album(id.into())).await } else { bounded(6, catalog::lookup_saavn_album(SAAVN, id)).await };
     let value = match primary {
-        Ok(value) if !value.partial => value,
-        result => {
-            let names = id.strip_prefix("saavn:album:search:").and_then(|value| value.split_once(':')).map(|(artist, title)| Ok::<_, String>((decoded_name(title)?, decoded_name(artist)?))).transpose()?.or_else(|| known_album(id));
-            if let Some((title, artist)) = names { match bounded(12, itunes_metadata::named_album(&title, &artist)).await { Ok(value) => value, Err(_) => result? } } else { match result { Ok(value) => value, Err(error) => match stale(&key) { Some(Value::Album(value)) => return Ok(value), _ => return Err(error) } } }
-        }
+        Ok(value) => value,
+        Err(error) => match stale(&key) { Some(Value::Album(value)) if value.info.id == id => return Ok(value), _ => return Err(error) },
     };
+    if !id.starts_with("saavn:album:search:") && value.info.id != id { return Err("Provider returned a different album identity.".into()); }
     save(&key, Value::Album(value.clone()), !value.partial); Ok(value)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn captured_seven_cards_require_recording_credits_and_reissue_aware_album_selection() {
+        let fixture:serde_json::Value=serde_json::from_str(include_str!("../../tests/fixtures/artist-anirudh-live.json")).unwrap();
+        let artist=|row:&serde_json::Value| CatalogArtist{id:row["id"].as_str().unwrap().into(),name:row["name"].as_str().unwrap().into(),artwork_url:row["artworkUrl"].as_str().map(str::to_owned)};
+        let candidates:Vec<_>=fixture["search"]["artists"].as_array().unwrap().iter().map(artist).collect();
+        assert_eq!(candidates.len(),7);
+        let cards=credited_artists(candidates.clone(),vec![candidates[0].clone(),candidates[1].clone()]);
+        assert_eq!(cards.len(),2);
+        let profiles:Vec<_>=fixture["profiles"].as_array().unwrap().iter().map(|profile| {
+            let evidence=profile["evidence"].as_array().unwrap().iter().map(|row| {
+                let mut track=song(row["id"].as_str().unwrap(),row["title"].as_str().unwrap(),row["artist"].as_str().unwrap(),row["duration"].as_f64().unwrap());
+                track.album=row["album"].as_str().unwrap().into(); track.album_id=row["albumId"].as_str().map(str::to_owned);
+                track.language=row["language"].as_str().map(str::to_owned);
+                track.artists=row["artists"].as_array().unwrap().iter().map(|credit|itunes_metadata::CatalogArtistCredit{name:credit["name"].as_str().unwrap().into(),id:credit["id"].as_str().map(str::to_owned)}).collect();
+                track.recording_metadata=serde_json::from_value(row["recordingMetadata"].clone()).ok(); track
+            }).collect();
+            let albums=profile["albums"].as_array().unwrap().iter().map(|row|CatalogAlbum{id:row["id"].as_str().unwrap().into(),title:row["title"].as_str().unwrap().into(),artist:String::new(),artists:vec![],artwork_url:None,year:row["year"].as_u64().map(|year|year as u32),track_count:None}).collect();
+            ArtistDetails{evidence,verified_ids:vec![],info:artist(&profile["info"]),top_tracks:vec![],albums,similar_artists:vec![]}
+        }).collect();
+        let selected=evidence_albums(&profiles[0],&profiles);
+        assert_eq!(selected.len(),3);
+        assert!(selected.iter().any(|album|album.title=="3"));
+        assert!(!selected.iter().any(|album|album.title=="Ethir Neechal"));
+        assert!(artist_overlap(&profiles[0],&profiles[1]));
+    }
+    #[test]
+    #[ignore = "live provider artist regression"]
+    fn live_anirudh_search_resolution() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let rows=entities("Anirudh Ravichander").await.unwrap();
+            println!("CARDS {}",serde_json::to_string(&rows).unwrap());
+            let resolved=resolve_artists("Anirudh Ravichander",&rows.artists).await;
+            println!("RESOLVED {}",resolved.len());
+            assert_eq!(rows.artists.len(),2,"only credited artist identities belong in the initial search");
+            assert_eq!(resolved.len(),1,"broader evidence must confirm the live identity");
+            for id in &resolved[0].verified_ids { assert_eq!(artist(id).await.unwrap().info.id,resolved[0].info.id); }
+            for id in ["saavn:artist:455663","itunes:480976476"] {
+                let proof=artist_proof(id).await.unwrap();
+                println!("PROOF {id} {}",serde_json::json!({"info":proof.info,"evidence":proof.evidence,"albums":proof.albums}));
+            }
+        });
+    }
+    fn anirudh_profiles() -> (ArtistDetails, ArtistDetails) {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!("../../tests/fixtures/artist-anirudh.json")).unwrap();
+        let make = |provider: &str, top: &str| {
+            let id = fixture[provider].as_str().unwrap();
+            let name = fixture["name"].as_str().unwrap();
+            let rows = |titles: Vec<(String, String, f64, String)>| titles.into_iter().enumerate().map(|(n,(title,release,duration,credits))| {
+                let mut row = song(&format!("{id}:record:{n}"), &title, &credits, duration);
+                row.album = release; row.album_id = Some(format!("{id}:release:{n}"));
+                row.artists[0].id = Some(id.into()); row
+            }).collect::<Vec<_>>();
+            let top_tracks = rows(fixture[top].as_array().unwrap().iter().map(|title|(title.as_str().unwrap().into(),title.as_str().unwrap().into(),180.0,name.into())).collect());
+            let mut evidence = top_tracks.clone();
+            let shared = rows(fixture["shared"].as_array().unwrap().iter().map(|track| {
+                let mut credits = vec![name];
+                credits.extend(track["guests"].as_array().unwrap().iter().map(|guest|guest.as_str().unwrap()));
+                (track["title"].as_str().unwrap().into(),track["release"].as_str().unwrap().into(),track["duration"].as_f64().unwrap(),credits.join(", "))
+            }).collect());
+            for mut row in shared { row.id.push_str(":shared"); evidence.push(row); }
+            ArtistDetails { evidence, verified_ids:vec![], info:CatalogArtist{id:id.into(),name:name.into(),artwork_url:Some(format!("{provider}-portrait"))}, top_tracks, albums:vec![], similar_artists:vec![] }
+        };
+        (make("saavn","saavnTopTen"),make("apple","appleTopTen"))
+    }
+
+    #[test]
+    fn broader_anirudh_evidence_resolves_old_links_and_cached_searches() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (saavn,apple)=anirudh_profiles();
+            let mut narrow_a=saavn.clone(); narrow_a.evidence.clear();
+            let mut narrow_b=apple.clone(); narrow_b.evidence.clear();
+            assert!(!artist_overlap(&narrow_a,&narrow_b));
+            assert!(artist_overlap(&saavn,&apple));
+            for profile in [&saavn,&apple] { save(&format!("artist-proof:{}",profile.info.id),Value::Artist(profile.clone()),true); }
+            let cards=vec![saavn.info.clone(),apple.info.clone()];
+            let resolved=resolve_artists("fixture Anirudh",&cards).await;
+            assert_eq!(resolved.len(),1); assert_eq!(resolved[0].info.id,saavn.info.id);
+            assert_eq!(resolved[0].info.artwork_url,saavn.info.artwork_url);
+            assert_eq!(resolved[0].top_tracks.len(),26);
+            for id in [&saavn.info.id,&apple.info.id] {
+                let profile=artist(id).await.unwrap();
+                assert_eq!(profile.verified_ids.len(),2); assert_eq!(profile.info.id,saavn.info.id);
+            }
+            assert_eq!(resolve_artists("fixture Anirudh",&cards).await.len(),1);
+        });
+    }
+
+    #[test]
+    fn album_fallback_uses_only_candidate_credits_and_at_most_three_releases() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let (mut saavn,mut apple)=anirudh_profiles();
+            saavn.info.id="saavn:artist:88000001".into(); apple.info.id="itunes:88000002".into();
+            for row in &mut saavn.evidence { row.artists[0].id=Some(saavn.info.id.clone()); }
+            for row in &mut apple.evidence { row.artists[0].id=Some(apple.info.id.clone()); }
+            let shared=saavn.evidence.split_off(10);
+            for (n,track) in shared.into_iter().enumerate() {
+                let info=CatalogAlbum{id:format!("saavn:album:8800000{n}"),title:track.album.clone(),artist:saavn.info.name.clone(),artists:track.artists.clone(),artwork_url:None,year:None,track_count:Some(2)};
+                saavn.albums.push(info.clone());
+                let mut uncredited=track.clone(); uncredited.id.push_str(":uncredited"); uncredited.artists[0].id=Some("saavn:artist:9".into());
+                save(&format!("album:{}",info.id),Value::Album(AlbumDetails{info,tracks:vec![uncredited,track],partial:false}),true);
+            }
+            let mut fourth=saavn.albums[0].clone(); fourth.id="saavn:album:88000009".into(); saavn.albums.push(fourth);
+            for profile in [&saavn,&apple] { save(&format!("artist-proof:{}",profile.info.id),Value::Artist(profile.clone()),true); }
+            let cards=vec![saavn.info.clone(),apple.info.clone()];
+            let resolved=resolve_artists("album fallback fixture",&cards).await;
+            assert_eq!(resolved.len(),1);
+            let Some(Value::Artist(proof))=cached(&format!("artist-proof:{}",saavn.info.id)) else { panic!("missing proof"); };
+            assert_eq!(proof.evidence.len(),13);
+            assert!(proof.evidence.iter().all(|track|track.artists[0].id.as_ref()==Some(&saavn.info.id)));
+        });
+    }
+
+    #[test]
+    fn evidence_rejects_namesakes_repeats_collaboration_entities_and_ambiguity() {
+        let (saavn,apple)=anirudh_profiles();
+        for kind in ["namesake","repeat","collaboration","insufficient","uncredited"] {
+            let mut other=apple.clone();
+            match kind {
+                "namesake" => for row in &mut other.evidence { row.title.push_str(" other"); },
+                "repeat" => for row in &mut other.evidence { row.album_id=Some("same-release".into()); },
+                "collaboration" => {
+                    for row in &mut other.evidence { row.artists.push(itunes_metadata::CatalogArtistCredit{id:None,name:"Permanent collaborator".into()}); }
+                },
+                "insufficient" => { other.evidence.pop(); },
+                _ => for row in &mut other.evidence { row.artists[0].id=None; },
+            }
+            assert!(!artist_overlap(&saavn,&other),"{kind}");
+        }
+        let mut duplicate=apple.clone(); duplicate.info.id="itunes:99900001".into();
+        for row in &mut duplicate.evidence { row.artists[0].id=Some(duplicate.info.id.clone()); }
+        let mut cards=vec![saavn.info.clone(),apple.info.clone(),duplicate.info.clone()];
+        unify_artists(&mut cards,&[saavn,apple,duplicate]); assert_eq!(cards.len(),3);
+    }
+
+    #[test]
+    fn pair_budget_skips_incomplete_ambiguity_groups_and_deadline_cancels_pending_requests() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            let make=|id:&str|CatalogArtist{id:id.into(),name:"Timeout fixture".into(),artwork_url:None};
+            let mut cards=vec![make("saavn:artist:99000001"),make("itunes:99000002")];
+            assert_eq!(verification_candidates(&cards).len(),2);
+            cards.extend([make("itunes:99000003"),make("itunes:99000004")]);
+            assert_eq!(verification_candidates(&cards).len(),4);
+            cards.push(make("itunes:99000005"));
+            assert!(verification_candidates(&cards).is_empty());
+            cards.truncate(2);
+            let permits=verification_requests().acquire_many(2).await.unwrap();
+            let deadline=tokio::time::Instant::now()+Duration::from_millis(10);
+            assert!(resolve_artists_until("timeout fixture",&cards,deadline).await.is_empty());
+            drop(permits);
+            // Failed verification is cached briefly and cannot turn a retry into an identity guess.
+            assert!(resolve_artists("timeout fixture",&cards).await.is_empty());
+            assert!(cached("artist:itunes:99000002").is_none());
+        });
+    }
+    #[test]
+    fn interactive_records_preserve_original_provider_rows_and_metadata() {
+        let a=song("saavn:abcdefgh","Evening Song","Gini",180.0);
+        let mut b=song("itunes:42","Evening Song","Gini",180.0);b.artwork_url=Some("apple-cover".into());
+        assert_eq!(merge_songs("Evening Song",vec![a.clone()],vec![b.clone()],60).len(),1);
+        let rows=rank_songs("Evening Song",vec![a],vec![b],60,false);
+        assert_eq!(rows.len(),2);
+        assert_eq!(rows[0].id,"saavn:abcdefgh");assert!(rows[0].artwork_url.is_none());
+        assert_eq!(rows[1].id,"itunes:42");assert_eq!(rows[1].artwork_url.as_deref(),Some("apple-cover"));
+    }
+    #[test]
+    fn interactive_record_cache_cannot_reuse_the_lossy_legacy_cache() {
+        let a=song("saavn:abcdefgh","Cache control","Gini",180.0);
+        let b=song("itunes:42","Cache control","Gini",180.0);
+        save("songs:phase3-cache",Value::Songs(vec![a.clone()]),true);
+        save("song-records:phase3-cache",Value::Songs(vec![a,b]),true);
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            assert_eq!(search("phase3-cache",60).await.unwrap().len(),1);
+            assert_eq!(search_records("phase3-cache",60).await.unwrap().len(),2);
+            for query in ["", "\0bad"] { assert!(catalog::search_catalog_records(query.into(),None).await.is_err()); }
+        });
+    }
+    #[test]
+    fn verified_artist_mapping_requires_independent_releases_and_credit_contexts() {
+        let make=|id: &str| ArtistDetails{evidence:vec![],verified_ids:vec![],info:CatalogArtist{id:id.into(),name:"Same name".into(),artwork_url:None},top_tracks:(0..3).map(|n|{let mut row=song(&format!("{id}:{n}"),&format!("Song {n}"),"Same name",180.0);row.album_id=Some(format!("{id}:album:{n}"));row.artists[0].id=Some(id.into());row}).collect(),albums:vec![],similar_artists:vec![]};
+        let a=make("saavn:artist:1");let b=make("itunes:2");
+        assert!(artist_overlap(&a,&b));
+        let mut sparse=b.clone();sparse.top_tracks.truncate(1);assert!(!artist_overlap(&a,&sparse));
+        let mut conflict=b.clone();conflict.top_tracks[0].title.push_str(" (Live)");assert!(!artist_overlap(&a,&conflict));
+        let mut compilation=b.clone();for row in &mut compilation.top_tracks{row.album_id=Some("one-release".into());}assert!(!artist_overlap(&compilation,&a));
+        let mut unrelated=b.clone();for row in &mut unrelated.top_tracks{row.title.push_str(" other");}assert!(!artist_overlap(&a,&unrelated));
+        let mut missing=b.clone();for row in &mut missing.top_tracks{row.album_id=None;}assert!(!artist_overlap(&a,&missing));
+        let mut uncredited=b.clone();for row in &mut uncredited.top_tracks{row.artists[0].id=None;}assert!(!artist_overlap(&a,&uncredited));
+        let mut rows=vec![a.info.clone(),b.info.clone()];unify_artists(&mut rows,&[a.clone(),b.clone(),make("saavn:artist:3")]);assert_eq!(rows.len(),2);
+        unify_artists(&mut rows,&[a.clone(),b.clone()]);assert_eq!(rows.len(),1);
+        let mut other_query=vec![a.info,b.info];mapped_artist_cards(&mut other_query);assert_eq!(other_query.len(),1);assert_eq!(other_query[0].id,"saavn:artist:1");
+    }
+
+    #[test]
+    #[ignore = "explicit live identity verification"]
+    fn live_artist_equivalence() {
+        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap().block_on(async {
+            for query in ["Gini","Sai Abhyankkar"] {
+                let rows=entities(query).await.unwrap();println!("{query}: {}",serde_json::to_string(&rows).unwrap());
+                let chosen=rows.artists.iter().find(|row|row.id.starts_with("saavn:")&&catalog::same_name(&row.name,query)&&row.artwork_url.is_some()).unwrap();
+                let details=artist(&chosen.id).await.unwrap();println!("PROFILE {}",serde_json::to_string(&details).unwrap());
+                assert_eq!(details.verified_ids.len(),2,"{query} must have corroborated mapping");
+                for id in &details.verified_ids{assert_eq!(artist(id).await.unwrap().info.id,chosen.id);}
+                if query=="Gini"{assert!(!details.verified_ids.iter().any(|id|id=="saavn:artist:1249318"));}
+            }
+        });
+    }
     fn song(id: &str, title: &str, artist: &str, duration: f64) -> CatalogTrack {
         CatalogTrack { recording_metadata: None, play_count: None, id: id.into(), title: title.into(), artist: artist.into(), artists: catalog::artist_names(artist).into_iter().map(|name| itunes_metadata::CatalogArtistCredit { name, id: None }).collect(), artist_id: None, album: "Release".into(), album_id: None, duration, artwork_url: None, genre: None, language: None }
     }
@@ -353,29 +641,43 @@ mod tests {
     }
 
     #[test]
-    fn cross_provider_artist_grouping_requires_two_distinct_strict_recordings() {
+    fn provider_entities_are_not_equated_by_name_or_recording_overlap() {
         let artist = |id: &str| CatalogArtist { id:id.into(), name:"Gini".into(), artwork_url:None };
-        let originals=vec![artist("itunes:1"),artist("saavn:artist:2"),artist("saavn:artist:3")];
-        let track = |id: &str, title: &str, artist_id: &str| { let mut row=song(id,title,"Gini",180.0);row.artists[0].id=Some(artist_id.into());row };
-        let mut tracks=vec![track("itunes:a","Sukoon","itunes:1"),track("saavn:a","Sukoon","saavn:artist:2")];
-        let mut rows=originals.clone();group_artist_recordings(&mut rows,&tracks);assert_eq!(rows.len(),3);
-        tracks.push(track("saavn:duplicate","Sukoon","saavn:artist:2"));
-        let mut rows=originals.clone();group_artist_recordings(&mut rows,&tracks);assert_eq!(rows.len(),3);
-        tracks.extend([track("itunes:b","Aashiyan","itunes:1"),track("saavn:b","Aashiyan (Live)","saavn:artist:2")]);
-        let mut rows=originals.clone();group_artist_recordings(&mut rows,&tracks);assert_eq!(rows.len(),3);
-        tracks.last_mut().unwrap().title="Aashiyan".into();
-        let mut rows=originals;group_artist_recordings(&mut rows,&tracks);
-        assert_eq!(rows.iter().map(|row|row.id.as_str()).collect::<Vec<_>>(),vec!["saavn:artist:2","saavn:artist:3"]);
+        let result = credited_artists(vec![artist("saavn:artist:20043211")], vec![artist("itunes:1629301422"),artist("saavn:artist:20043211"),artist("saavn:artist:1249318"),artist("artist:name:Gini")]);
+        assert_eq!(result.len(),3);
+        assert!(result.iter().any(|row|row.id=="itunes:1629301422"));
+        assert!(credited_artists(vec![artist("saavn:artist:42")],vec![artist("artist:name:Gini")]).is_empty());
     }
 
     #[test]
-    fn named_gini_credit_reuses_unique_exact_provider_artist_without_substring_matches() {
-        let artist = |id: &str, name: &str| CatalogArtist { id:id.into(),name:name.into(),artwork_url:None };
-        let credited = vec![artist("artist:name:gini", "gini")];
-        let result=credited_artists(vec![artist("saavn:artist:42","Gini"),artist("saavn:artist:43","Ginikachukwu")],credited.clone());
-        assert_eq!(result[0].id,"saavn:artist:42");assert_eq!(result[0].name,"Gini");
-        let ambiguous=credited_artists(vec![artist("saavn:artist:42","Gini"),artist("saavn:artist:44","gini")],credited);
-        assert_eq!(ambiguous[0].id,"artist:name:gini");
+    fn captured_phoenix_and_aurora_homonyms_keep_their_provider_ids() {
+        let corpus: serde_json::Value = serde_json::from_str(include_str!("../../tests/fixtures/artist-identity-live.json")).unwrap();
+        for name in ["Phoenix","Aurora"] {
+            let label=format!("apple-search-{name}");
+            let data=&corpus["responses"].as_array().unwrap().iter().find(|row|row["label"]==label).unwrap()["data"]["results"];
+            let artists: Vec<_> = data.as_array().unwrap().iter().filter(|row|row["artistName"].as_str().is_some_and(|candidate|catalog::same_name(candidate,name))).map(|row|CatalogArtist{id:format!("itunes:{}",row["artistId"].as_u64().unwrap()),name:row["artistName"].as_str().unwrap().into(),artwork_url:None}).collect();
+            assert!(artists.len()>2);
+            let ids: std::collections::HashSet<_>=artists.iter().map(|row|row.id.clone()).collect();
+            let results=credited_artists(vec![],artists);
+            assert_eq!(results.len(),ids.len());
+            assert!(results.iter().all(|row|ids.contains(&row.id)));
+        }
+    }
+
+    #[test]
+    fn cached_artist_navigation_is_scoped_and_unresolved_ids_are_rejected() {
+        let runtime=tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        runtime.block_on(async {
+            for id in ["saavn:artist:1249318","saavn:artist:20043211","itunes:1629301422"] {
+                let value=ArtistDetails { evidence: vec![], verified_ids: vec![],info:CatalogArtist{id:id.into(),name:"Gini".into(),artwork_url:None},top_tracks:vec![],albums:vec![],similar_artists:vec![]};
+                save(&format!("artist:{id}"),Value::Artist(value),true);
+            }
+            for id in ["saavn:artist:1249318","saavn:artist:20043211","itunes:1629301422"] { assert_eq!(artist(id).await.unwrap().info.id,id); }
+            for id in ["artist:name:gini","saavn:artist:name:Gini","itunes:001","saavn:artist:0","unsupported:1"] { assert!(artist(id).await.is_err()); }
+            let wrong=AlbumDetails {info:CatalogAlbum{id:"itunes:88".into(),title:"Release".into(),artist:"Gini".into(),artists:vec![],artwork_url:None,year:None,track_count:None},tracks:vec![],partial:true};
+            save("album:unsupported:cached",Value::Album(wrong),true);
+            assert!(album("unsupported:cached").await.is_err());
+        });
     }
 
     #[test]
@@ -457,7 +759,7 @@ mod tests {
     }
     #[test]
     fn invalid_and_ambiguous_locators_never_become_provider_queries() {
-        assert!(decoded_name("%00Hasan").is_err()); assert!(decoded_name("").is_err());
+        assert!(!catalog::valid_artist_id("saavn:artist:%00Hasan")); assert!(!catalog::valid_artist_id(""));
         let a = CatalogAlbum { id: "1".into(), title: "Release".into(), artist: "Hasan Raheem".into(), artists: vec![], year: Some(2023), artwork_url: None, track_count: None };
         let mut b = a.clone(); b.id = "2".into(); b.year = Some(2024); assert!(!same_album(&a, &b));
     }
@@ -483,7 +785,9 @@ mod tests {
                 assert!(rows.iter().all(|row| relevance(query, &row.title, &row.artist) > 0));
                 if query.contains("Wishes") { assert!(rows.iter().any(|row| row.title == "Wishes" && row.artist.contains("Hasan Raheem"))); }
             }
-            let profile = artist("artist:name:Hasan%20Raheem").await.unwrap();
+            let options = entities("Hasan Raheem").await.unwrap();
+            let selected = options.artists.iter().find(|artist| catalog::same_name(&artist.name, "Hasan Raheem")).unwrap();
+            let profile = artist(&selected.id).await.unwrap();
             println!("artist: {} {}, tracks={}, albums={}", profile.info.id, profile.info.name, profile.top_tracks.len(), profile.albums.len());
             assert!(catalog::same_name(&profile.info.name, "Hasan Raheem")); assert!(!profile.top_tracks.is_empty()); assert!(!profile.albums.is_empty());
             if let Some(release) = profile.albums.first() { let details = album(&release.id).await.unwrap(); assert!(!details.tracks.is_empty()); println!("album {}: {} tracks", details.info.title, details.tracks.len()); }

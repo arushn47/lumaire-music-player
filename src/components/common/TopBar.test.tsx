@@ -59,6 +59,26 @@ it("renders sharing on Wi-Fi indicator when nearbySharing is true", () => {
   expect(html).toContain('Sharing on Wi-Fi');
 });
 
+it("renders connected on Wi-Fi indicator when nearbySharing and nearbyConnected are true", () => {
+  const onOpenCollectionHub = vi.fn();
+  const html = renderToStaticMarkup(
+    <TopBar
+      view="discover"
+      heading="Discover new music"
+      sidebarCollapsed={false}
+      queueOpen={false}
+      onToggleSidebar={vi.fn()}
+      onToggleQueue={vi.fn()}
+      onOpenCollectionHub={onOpenCollectionHub}
+      nearbySharing={true}
+      nearbyConnected={true}
+    />
+  );
+
+  expect(html).toContain('class="topbar-sharing-pill sharing"');
+  expect(html).toContain('Connected on Wi-Fi');
+});
+
 
 it("puts software updates immediately after Sync only when an update is available", () => {
   const html=renderToStaticMarkup(<TopBar view="discover" heading="Discover" sidebarCollapsed={false} queueOpen={false} onToggleSidebar={()=>{}} onToggleQueue={()=>{}} onOpenImport={()=>{}} onOpenUpdates={()=>{}} onOpenConnect={()=>{}} updateLabel="Update v1.0.5" />);

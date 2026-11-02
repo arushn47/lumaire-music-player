@@ -43,7 +43,7 @@ dialog.expanded-player {
   left: 0;
   right: 0;
   height: 72px;
-  padding: 20px 24px;
+  padding: max(20px, env(safe-area-inset-top, 0px)) max(24px, env(safe-area-inset-right, 0px)) 20px max(24px, env(safe-area-inset-left, 0px));
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -52,8 +52,8 @@ dialog.expanded-player {
 }
 .expanded-close, .expanded-fullscreen {
   pointer-events: auto;
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   border-radius: 50%;
   display: grid;
   place-items: center;
@@ -83,7 +83,7 @@ dialog.expanded-player {
   display: grid;
   align-items: center;
   box-sizing: border-box;
-  transition: all 0.3s cubic-bezier(0.2, 0, 0, 1);
+  transition: none;
 }
 .expanded-layout.has-lyrics {
   grid-template-columns: minmax(320px, 4fr) minmax(0, 6fr);
@@ -129,6 +129,16 @@ dialog.expanded-player {
 }
 .expanded-cover-wrapper.is-playing {
   transform: scale(1);
+}
+
+.is-minimal .expanded-cover-wrapper { width: min(100%, max(100px, calc(100dvh - 340px))); }
+
+@media (pointer: coarse) {
+  dialog.expanded-player .expanded-close,
+  dialog.expanded-player .expanded-lyrics-toggle,
+  dialog.expanded-player .expanded-action-btn,
+  dialog.expanded-player .expanded-transport .player-buttons .icon-button,
+  dialog.expanded-player .expanded-transport .current-track-menu summary { min-width: 44px !important; min-height: 44px !important; }
 }
 
 .expanded-cover.cover {
@@ -214,6 +224,29 @@ dialog.expanded-player {
   text-overflow: ellipsis;
   display: block;
 }
+.expanded-track-menu {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.expanded-track-menu summary.expanded-action-btn {
+  list-style: none;
+  cursor: pointer;
+}
+.expanded-track-menu summary.expanded-action-btn::-webkit-details-marker {
+  display: none;
+}
+.expanded-track-menu .menu-popover {
+  bottom: calc(100% + 12px) !important;
+  top: auto !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: none !important;
+  transform-origin: bottom right !important;
+  animation: popover-appear var(--duration-fast) var(--ease-spring) !important;
+  z-index: 100 !important;
+}
 
 .expanded-player .expanded-transport .now-playing .icon-button {
   width: 36px;
@@ -292,6 +325,24 @@ dialog.expanded-player {
 }
 .expanded-player .expanded-transport .current-track-menu[open] {
   z-index: 85;
+}
+.expanded-player .expanded-transport .current-track-menu .menu-popover {
+  top: calc(100% + 8px);
+  bottom: auto;
+  transform-origin: top left;
+  animation: popover-appear var(--duration-fast) var(--ease-spring);
+}
+.expanded-player .expanded-layout.no-lyrics .current-track-menu .menu-popover {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  transform-origin: top center;
+}
+.expanded-player .expanded-layout.has-lyrics .current-track-menu .menu-popover {
+  left: 0;
+  right: auto;
+  transform: none;
+  transform-origin: top left;
 }
 .expanded-transport .seek-bar-top input[type="range"] {
   position: absolute;

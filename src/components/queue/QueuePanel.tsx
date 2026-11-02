@@ -202,6 +202,7 @@ export function QueuePanel({
               <ArtistLinks
                 className="now-playing-artist"
                 artistString={currentTrack.artist}
+                catalogId={currentTrack.metadataSourceId}
                 onNavigateArtist={onNavigateArtist}
                 maxArtists={2}
               />
@@ -304,6 +305,7 @@ export function QueuePanel({
                         <ArtistLinks
                           className="queue-artist"
                           artistString={t.artist}
+                          catalogId={t.metadataSourceId}
                           onNavigateArtist={onNavigateArtist}
                           maxArtists={2}
                         />

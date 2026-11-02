@@ -1,4 +1,5 @@
 export interface Track {
+  recordingMetadata?: RecordingMetadata | null;
   id: string;
   title: string;
   artist: string;
@@ -14,6 +15,12 @@ export interface Track {
   metadataSourceId?: string | null;
   /** Backend-owned offline copy, never a renderer-provided filesystem path. */
   offline?: boolean;
+}
+export interface RecordingMetadata {
+  sourceId: string;
+  isrcs: string[];
+  releaseDate: string | null;
+  artistAliases: Record<string, string[]>;
 }
 export interface RemoteSource {
   providerId: string;
@@ -104,6 +111,9 @@ export interface ListeningResume {
   updatedAt: number;
 }
 export interface Session {
+    nativeQueueRevision?: number;
+    nativeQueueEpoch?: string;
+    nativePositionAt?: number;
   replica?: import('./device-sync').PlaylistReplica;
   listeningResumes?: ListeningResume[];
   favoriteArtists: { id: string; name: string; artworkUrl?: string | null }[];

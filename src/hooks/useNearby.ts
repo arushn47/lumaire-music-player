@@ -5,9 +5,14 @@ import { portableTrack, type SharedState } from "../domain/nearby";
 import { player, playbackTracks } from "../player/service";
 import type { Playback } from "../player/controller";
 import { isQueuedCatalog, playSelection, resolveQueueEntry } from "../domain/queue";
-import type { SyncState } from '../domain/device-sync';
+import type { SyncState, SyncPeer } from '../domain/device-sync';
 import { reloadSyncedListening, flushListening } from '../player/listening-service';
 import { desktop } from '../adapters/native';
+
+const needsRediscovery = (error: unknown) => {
+  const message = String(error).toLowerCase();
+  return message.includes('cannot reach') || message.includes('sync interrupted') || message.includes('nearby connection interrupted');
+};
 
 export function useNearby(options: { ready: boolean; session: Session; tracks: Track[]; track?: Track; playback: Playback; update: (fn: (s: Session) => Session) => void; resolve: (track: Track) => Promise<Track>; applyReplica: (state: SyncState) => Promise<void>; flush: () => Promise<void> }) {
   const latest = useRef(options); latest.current = options;
@@ -18,8 +23,10 @@ export function useNearby(options: { ready: boolean; session: Session; tracks: T
   const [favoritesEnabled, setFavoritesEnabled] = useState(true);
   const [syncMessage, setSyncMessage] = useState('');
   const [lastSyncedAt, setLastSyncedAt] = useState<number | null>(null);
+  const [peer, setPeer] = useState<SyncPeer | null>(null);
   const syncFlight = useRef<Promise<void> | null>(null), revision = useRef(0);
   const peerLink = useRef('');
+  const rediscovery = useRef<Promise<string> | null>(null);
   const retryAt = useRef(0), failures = useRef(0), syncEpoch = useRef(0);
   async function sync(link = peerLink.current, automatic = false) {
     if (automatic && Date.now() < retryAt.current) return;
@@ -36,6 +43,13 @@ export function useNearby(options: { ready: boolean; session: Session; tracks: T
         if (!latest.current.session.replica?.favoritesInitialized || local.cells.length) { await latest.current.applyReplica(local); await latest.current.flush(); }
         if (local.revision !== revision.current) await reloadSyncedListening();
         revision.current = local.revision;
+        if (desktop) {
+          try {
+            const p = await collections.getPeer();
+            setPeer(p);
+            if (p && p.lastSeen) setLastSyncedAt(prev => Math.max(prev || 0, p.lastSeen));
+          } catch { /* offline / mock */ }
+        }
         let more = false;
         if (link) {
           // Bounded pages; interrupted work resumes from durable cursors on the next tick.
@@ -52,6 +66,7 @@ export function useNearby(options: { ready: boolean; session: Session; tracks: T
         if (link) { failures.current = 0; retryAt.current = 0; setLastSyncedAt(Date.now()); setError(''); setSyncMessage(more ? 'More changes are syncing in the background…' : 'Changes synced in both directions.'); }
       } catch (e) {
         if (epoch !== syncEpoch.current) return;
+        if (link && needsRediscovery(e)) void rediscover(link).catch(() => {});
         retryAt.current = Date.now() + Math.min(60000, 5000 * 2 ** Math.min(failures.current++, 4));
         setError(String(e)); setSyncMessage('Changes are saved on this device. Retrying automatically.'); throw e;
       }
@@ -66,7 +81,9 @@ export function useNearby(options: { ready: boolean; session: Session; tracks: T
       peerLink.current = localStorage.getItem('lumaire-paired-link') || '';
       if (peerLink.current) {
         setGuestLink(peerLink.current);
-        void collections.fetch(peerLink.current).then(setSnapshot).catch(() => {});
+        void collections.fetch(peerLink.current).then(setSnapshot).catch(async () => {
+          try { const updated = await rediscover(peerLink.current); setSnapshot(await collections.fetch(updated)); } catch { /* Keep retrying in the background. */ }
+        });
       }
       if (localStorage.getItem('lumaire-sharing-enabled') === 'true') void start();
     } catch { /* Storage can be unavailable; active pairing still works. */ }
@@ -93,6 +110,17 @@ export function useNearby(options: { ready: boolean; session: Session; tracks: T
   const failed = useRef(""); const generation = useRef(0);
   const lastPosition = useRef<number | null>(null);
   const ownedLoading = useRef<string | null>(null);
+  async function rediscover(link: string) {
+    if (rediscovery.current) return rediscovery.current;
+    const attempt = collections.rediscover(link).then(updated => {
+      peerLink.current = updated;
+      setGuestLink(updated);
+      try { localStorage.setItem('lumaire-paired-link', updated); } catch { /* The active connection still recovers. */ }
+      return updated;
+    });
+    rediscovery.current = attempt;
+    try { return await attempt; } finally { if (rediscovery.current === attempt) rediscovery.current = null; }
+  }
   async function start() {
     setBusy(true); setError("");
     try { setHostLink(await collections.startSharing());
@@ -103,7 +131,7 @@ export function useNearby(options: { ready: boolean; session: Session; tracks: T
   async function stop() {
     generation.current++; setFollowing(false); setGuestLink(""); setSnapshot(null);
     syncEpoch.current++; retryAt.current = 0; failures.current = 0;
-    peerLink.current = ''; setSyncMessage(''); setError(''); setLastSyncedAt(null);
+    peerLink.current = ''; setSyncMessage(''); setError(''); setLastSyncedAt(null); setPeer(null);
     try { localStorage.removeItem('lumaire-paired-link'); localStorage.removeItem('lumaire-sharing-enabled'); } catch { /* Active disconnection still succeeds. */ }
     try { await collections.stopSharing(true); setHostLink(""); } catch (e) { setError(String(e)); }
   }
@@ -169,12 +197,16 @@ export function useNearby(options: { ready: boolean; session: Session; tracks: T
         }
         lastPosition.current = position;
       } catch (e) {
-        if (!stopped) { setError(String(e)); if (++failures >= 3) { setFollowing(false); await player.pause(); } }
+        if (!stopped) {
+          setError(String(e));
+          if (failures === 0 && needsRediscovery(e)) { failures++; try { await rediscover(guestLink); return; } catch { /* Continue bounded retry handling below. */ } }
+          if (++failures >= 3) { setFollowing(false); await player.pause(); }
+        }
       } finally { inFlight = false; }
     }
     void poll(); const timer = window.setInterval(() => void poll(), 1500);
     return () => { stopped = true; generation.current++; clearInterval(timer); if (ownedLoading.current === player.state.playbackId && player.state.status === "loading") player.stop(); ownedLoading.current = null; };
   }, [following, guestLink]);
   useEffect(() => () => { generation.current++; void collections.stopSharing().catch(() => {}); }, []);
-  return { hostLink, guestLink, following, snapshot, error, busy, syncing, historyEnabled, favoritesEnabled, syncMessage, lastSyncedAt, sync: () => sync(), setHistorySync, setFavoritesSync, start, stop, connect, setFollowing: (value: boolean) => { generation.current++; failed.current = ""; lastPosition.current = null; setError(""); setFollowing(value); }, refresh: () => connect(guestLink) };
+  return { hostLink, guestLink, peer, following, snapshot, error, busy, syncing, historyEnabled, favoritesEnabled, syncMessage, lastSyncedAt, sync: () => sync(), setHistorySync, setFavoritesSync, start, stop, connect, setFollowing: (value: boolean) => { generation.current++; failed.current = ""; lastPosition.current = null; setError(""); setFollowing(value); }, refresh: () => connect(guestLink) };
 }

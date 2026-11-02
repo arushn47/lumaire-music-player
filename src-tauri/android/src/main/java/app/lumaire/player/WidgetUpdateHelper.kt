@@ -24,7 +24,6 @@ import android.widget.RemoteViews
 import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
 import java.io.File
 import java.io.InputStream
 import java.lang.ref.WeakReference
@@ -81,7 +80,7 @@ object WidgetUpdateHelper {
     private var cachedExtractedColors: ExtractedColors? = null
     private var cachedArtSource: Bitmap? = null
 
-    private var playerRef: WeakReference<ExoPlayer>? = null
+    private var playerRef: WeakReference<Player>? = null
     private var contextRef: WeakReference<Context>? = null
     private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
     private val ioExecutor by lazy { Executors.newSingleThreadExecutor() }
@@ -156,7 +155,7 @@ object WidgetUpdateHelper {
         updateLyricsWidgets(context)
     }
 
-    fun attachPlayer(context: Context, player: ExoPlayer) {
+    fun attachPlayer(context: Context, player: Player) {
         contextRef = WeakReference(context.applicationContext)
         playerRef = WeakReference(player)
         ensurePrefsLoaded(context)
@@ -195,6 +194,7 @@ object WidgetUpdateHelper {
     }
 
     fun skipNext(context: Context) {
+        PlaybackService.active?.queue?.takeIf { it.managed }?.let { it.advance(1, false); return }
         val player = playerRef?.get()
         if (player != null && player.hasNextMediaItem()) {
             player.seekToNextMediaItem()
@@ -205,6 +205,10 @@ object WidgetUpdateHelper {
     }
 
     fun skipPrevious(context: Context) {
+        PlaybackService.active?.queue?.takeIf { it.managed }?.let {
+            if ((playerRef?.get()?.currentPosition ?: 0) > 3000) playerRef?.get()?.seekTo(0) else it.advance(-1, false)
+            return
+        }
         val player = playerRef?.get()
         if (player != null && player.currentPosition > 3000L) {
             player.seekTo(0L)

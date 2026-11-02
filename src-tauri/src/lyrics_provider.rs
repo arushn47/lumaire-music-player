@@ -57,7 +57,7 @@ fn native_text(record: &Record) -> bool {
 }
 
 fn timing_compatible(record: &Record, duration: f64) -> bool {
-    if duration <= 0.0 || (record.duration - duration).abs() > 2.0 {
+    if !duration.is_finite() || !record.duration.is_finite() || duration <= 0.0 || record.duration <= 0.0 || (record.duration - duration).abs() > 2.0 {
         return false;
     }
     let Some(lrc) = record
@@ -71,15 +71,39 @@ fn timing_compatible(record: &Record, duration: f64) -> bool {
     let stamps = STAMP
         .get_or_init(|| regex::Regex::new(r"\[(\d{1,3}):([0-5]\d)(?:[.:](\d{1,3}))?\]").unwrap());
     let mut count = 0;
+    static OFFSET: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let mut offset=0.0;
+    for tag in OFFSET.get_or_init(|| regex::Regex::new(r"(?im)^\s*\[offset:([+-]?\d+)\]\s*$").unwrap()).captures_iter(lrc) {
+        let Ok(value)=tag[1].parse::<i64>() else { return false };
+        if !(-86400000..=86400000).contains(&value) { return false; }
+        offset=value as f64/1000.0;
+    }
     for stamp in stamps.captures_iter(lrc) {
         let seconds =
-            stamp[1].parse::<f64>().unwrap_or(0.0) * 60.0 + stamp[2].parse::<f64>().unwrap_or(0.0);
-        if seconds > duration + 2.0 {
+            stamp[1].parse::<f64>().unwrap_or(0.0) * 60.0 + stamp[2].parse::<f64>().unwrap_or(0.0)
+                + stamp.get(3).map(|fraction| format!("0.{}",fraction.as_str()).parse::<f64>().unwrap_or(0.0)).unwrap_or(0.0);
+        if seconds + offset > duration + 2.0 {
             return false;
         }
         count += 1;
     }
-    count > 0
+    static WORD: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    for stamp in WORD.get_or_init(||regex::Regex::new(r"<(\d{1,3}):([0-5]\d)(?:[.:](\d{1,3}))?>").unwrap()).captures_iter(lrc) {
+        let seconds=stamp[1].parse::<f64>().unwrap()*60.0+stamp[2].parse::<f64>().unwrap()+stamp.get(3).map(|fraction|format!("0.{}",fraction.as_str()).parse::<f64>().unwrap()).unwrap_or(0.0);
+        if seconds+offset>duration+2.0{return false;}
+    }
+    count > 0 && plain_text(record).is_some()
+}
+
+fn version_labels(title: &str) -> Vec<String> {
+    static LABELS: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let mut labels: Vec<_> = LABELS.get_or_init(||regex::Regex::new(r"(?i)\b(?:live|remix|acoustic|instrumental|karaoke|cover|demo|remaster(?:ed)?|radio\s+edit|extended|slowed|sped\s+up|female|male)\b").unwrap()).find_iter(title).map(|label|label.as_str().to_lowercase()).collect();
+    labels.sort();labels.dedup();labels
+}
+fn lyric_title(title: &str) -> String {
+    let mut prepared=lyric_identity::query_title(title);
+    for label in version_labels(title) { if !version_labels(&prepared).contains(&label) { prepared.push_str(&format!(" ({label})")); } }
+    prepared
 }
 
 fn plain_text(record: &Record) -> Option<String> {
@@ -123,7 +147,7 @@ fn result(record: Record, duration: f64) -> LyricResult {
     }
     if let Some(text) = plain_text(&record) {
         LyricResult::Plain { text, matched }
-    } else if record.instrumental {
+    } else if record.instrumental && duration.is_finite() && record.duration.is_finite() && duration>0.0 && record.duration>0.0 && (record.duration-duration).abs()<=2.0 {
         LyricResult::Instrumental
     } else {
         LyricResult::NotFound
@@ -136,11 +160,22 @@ fn candidate<'a>(
     artist: &str,
     duration: f64,
 ) -> Option<&'a Record> {
+    if lyric_identity::primary_artist(artist).is_empty() {
+        if !duration.is_finite() || duration<=0.0 { return None; }
+        let names:std::collections::HashSet<_>=records.iter().filter(|record|has_content(record)
+            && lyric_identity::title(&lyric_title(&record.track_name))==lyric_identity::title(&lyric_title(title))
+            && version_labels(&record.track_name)==version_labels(title)
+            && record.duration.is_finite()&&(record.duration-duration).abs()<=2.0)
+            .map(|record|lyric_identity::fingerprint(&record.artist_name)).filter(|name|!name.is_empty()).collect();
+        if names.len()!=1 { return None; }
+    }
     records
         .iter()
         .filter(|r| {
-            lyric_identity::title(&r.track_name) == lyric_identity::title(title)
-                && (lyric_identity::primary_artist(artist).is_empty()
+            version_labels(&r.track_name) == version_labels(title)
+                && r.duration.is_finite() && r.duration >= 0.0
+                && lyric_identity::title(&lyric_title(&r.track_name)) == lyric_identity::title(&lyric_title(title))
+                && ((lyric_identity::primary_artist(artist).is_empty() && duration>0.0 && (r.duration-duration).abs()<=2.0)
                     || lyric_identity::artists_match(&r.artist_name, artist)
                     || ((r.duration - duration).abs() <= 2.0
                         && duration > 0.0
@@ -271,7 +306,7 @@ struct RedHit {
 }
 
 async fn fetch_red(base: &str, title: &str, artist: &str, duration: f64) -> Result<LyricResult, String> {
-    let prepared = lyric_identity::query_title(title);
+    let prepared = lyric_title(title);
     let (artist, title) = clean_artist_for_lyrics(artist, &prepared);
     let primary = lyric_identity::primary_artist(&artist);
     // Without recording duration and artist evidence, search results are too ambiguous.
@@ -291,7 +326,8 @@ async fn fetch_red(base: &str, title: &str, artist: &str, duration: f64) -> Resu
         .filter(|hit: &RedHit| {
             valid_isrc(&hit.isrc) && hit.title.len() <= 2000 && hit.artist.len() <= 2000 && hit.album.len() <= 2000
                 && hit.duration.is_finite() && (hit.duration - duration).abs() <= 2.0
-                && lyric_identity::title(&hit.title) == lyric_identity::title(&title)
+                && lyric_identity::title(&lyric_title(&hit.title)) == lyric_identity::title(&lyric_title(&title))
+                && version_labels(&hit.title) == version_labels(&title)
                 && (lyric_identity::artists_match(&hit.artist, &artist) || artist_name_extension(&hit.artist, &artist))
         }).collect();
     candidates.sort_by(|a, b| (a.duration - duration).abs().total_cmp(&(b.duration - duration).abs()));
@@ -355,7 +391,7 @@ async fn fetch_from(
         return Err("Invalid track information for lyrics lookup.".into());
     }
     // Remove film decorations before trying Artist - Song extraction.
-    let prepared_title = lyric_identity::query_title(&title);
+    let prepared_title = lyric_title(&title);
     let (artist, title) = clean_artist_for_lyrics(&artist, &prepared_title);
     if title.trim().is_empty() {
         return Ok(LyricResult::NotFound);
@@ -517,6 +553,78 @@ fn has_content(record: &Record) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "explicit Windows audit of sanitized live snapshots"]
+    fn audit_live_corpus_snapshots() {
+        let root=std::path::Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap();
+        let data:serde_json::Value=serde_json::from_str(&std::fs::read_to_string(root.join("test-results/lyrics-live-corpus.json")).unwrap()).unwrap();
+        let mut results=Vec::new();
+        for case in data["cases"].as_array().unwrap() {
+            if !case["error"].is_null(){results.push(serde_json::json!({"title":case["queryTitle"],"error":case["error"]}));continue;}
+            let title=case["queryTitle"].as_str().unwrap();let artist=case["queryArtist"].as_str().unwrap();
+            let observed:serde_json::Value=serde_json::from_str(include_str!("../../tests/fixtures/lyrics-accuracy-corpus.json")).unwrap();
+            let seed=observed["cases"].as_array().unwrap().iter().find(|item|item["queryTitle"]==title).unwrap();
+            let original=seed["records"].as_array().unwrap().iter().find(|row|lyric_identity::title(row["title"].as_str().unwrap())==lyric_identity::title(title)&&version_labels(row["title"].as_str().unwrap()).is_empty()).unwrap();
+            let duration=original["duration"].as_f64().unwrap();
+            let records=search_rows(case["records"].clone()).unwrap();
+            let selected=candidate(&records,title,artist,duration);
+            let before_unsafe=records.iter().filter(|row|lyric_identity::title(&row.track_name)==lyric_identity::title(title)&&lyric_identity::artists_match(&row.artist_name,artist)&&version_labels(&row.track_name)!=version_labels(title)&&(row.duration-duration).abs()<=2.0&&synced(row)).count();
+            results.push(serde_json::json!({"title":title,"duration":duration,"candidateCount":records.len(),"selected":selected.map(|row|serde_json::json!({"id":row.id,"title":row.track_name,"artist":row.artist_name,"duration":row.duration,"synchronized":timing_compatible(row,duration)})),"incompatibleVersionEligibilityBefore":before_unsafe,"incompatibleVersionEligibilityAfter":records.iter().filter(|row|version_labels(&row.track_name)!=version_labels(title)&&candidate(std::slice::from_ref(row),title,artist,duration).is_some()).count(),"elapsedMs":case["elapsedMs"]}));
+        }
+        std::fs::write(root.join("test-results/lyrics-live-audit.json"),serde_json::to_string_pretty(&results).unwrap()).unwrap();
+        println!("{}",serde_json::to_string_pretty(&results).unwrap());
+    }
+    #[test]
+    fn retained_real_song_corpus_rejects_alternate_editions_without_lyric_text() {
+        let corpus:serde_json::Value=serde_json::from_str(include_str!("../../tests/fixtures/lyrics-accuracy-corpus.json")).unwrap();
+        let mut positives=0;let mut negatives=0;let mut legacy_unsafe=0;
+        for case in corpus["cases"].as_array().unwrap() {
+            let query=case["queryTitle"].as_str().unwrap();
+            let rows=case["records"].as_array().unwrap();
+            let original=rows.iter().find(|row|lyric_identity::title(row["title"].as_str().unwrap())==lyric_identity::title(query)&&version_labels(row["title"].as_str().unwrap()).is_empty()).unwrap();
+            let duration=original["duration"].as_f64().unwrap();let artist=original["artist"].as_str().unwrap();
+            for row in rows {
+                let record=Record{id:None,album_name:String::new(),track_name:row["title"].as_str().unwrap().into(),artist_name:row["artist"].as_str().unwrap().into(),duration:row["duration"].as_f64().unwrap(),instrumental:false,synced_lyrics:Some("[00:01]Timing fixture".into()),plain_lyrics:None};
+                let correct=std::ptr::eq(row,original);
+                let accepted=candidate(std::slice::from_ref(&record),query,artist,duration).is_some();
+                if correct {positives+=1;assert!(accepted,"{}",record.track_name);} else {
+                    negatives+=1;assert!(!accepted,"{}",record.track_name);
+                    if lyric_identity::title(&record.track_name)==lyric_identity::title(query)&&lyric_identity::artists_match(&record.artist_name,artist)&&timing_compatible(&record,duration){legacy_unsafe+=1;}
+                }
+            }
+        }
+        assert_eq!((positives,negatives,legacy_unsafe),(10,14,1));
+        println!("Retained metadata replay: 10/10 positive controls; unsafe alternate synced eligibility 1/14 before, 0/14 after. Synthetic text only; no acoustic accuracy claim.");
+    }
+    #[test]
+    fn timing_guards_include_fraction_offset_and_word_ends_and_preserve_plain_text() {
+        for lrc in ["[offset:3000]\n[00:09.500]Timing fixture","[00:12.500]Timing fixture","[00:01]<00:01>Timing fixture<00:13>","[offset:99999999999999999999999999999]\n[00:01]Timing fixture"] {
+            let record=Record{id:None,album_name:String::new(),track_name:"Fixture".into(),artist_name:"Artist".into(),duration:10.0,instrumental:false,synced_lyrics:Some(lrc.into()),plain_lyrics:None};
+            assert!(!timing_compatible(&record,10.0),"{lrc}");
+            assert!(matches!(result(record,10.0),LyricResult::Plain{..}));
+        }
+        assert_eq!(version_labels(&lyric_title("Despacito (feat. Justin Bieber) [Remix]")),vec!["remix"]);
+        let remix=Record{id:None,album_name:String::new(),track_name:"Despacito (feat. Justin Bieber) [Remix]".into(),artist_name:"Luis Fonsi".into(),duration:230.0,instrumental:false,synced_lyrics:Some("[00:01]Timing fixture".into()),plain_lyrics:None};
+        assert!(candidate(std::slice::from_ref(&remix),&lyric_title(&remix.track_name),"Luis Fonsi",230.0).is_some());
+        assert!(candidate(std::slice::from_ref(&remix),"Despacito","Luis Fonsi",230.0).is_none());
+        assert!(candidate(&[],"Missing recording","Artist",200.0).is_none());
+    }
+    #[test]
+    fn unknown_artist_requires_duration_and_unambiguous_performer() {
+        let make=|artist:&str,duration:f64|Record{id:None,album_name:String::new(),track_name:"Hello".into(),artist_name:artist.into(),duration,instrumental:false,synced_lyrics:Some("[00:01]Timing fixture".into()),plain_lyrics:None};
+        assert!(candidate(&[make("Adele",200.0)],"Hello","",200.0).is_some());
+        assert!(candidate(&[make("Adele",200.0),make("Other",200.0)],"Hello","",200.0).is_none());
+        assert!(candidate(&[make("Adele",180.0)],"Hello","",200.0).is_none());
+        assert!(candidate(&[make("Adele",200.0)],"Hello","",0.0).is_none());
+    }
+    #[test]
+    fn empty_timestamps_are_not_lyrics_and_instrumental_requires_recording_duration() {
+        let record=Record{id:None,album_name:String::new(),track_name:"Fixture".into(),artist_name:"Artist".into(),duration:200.0,instrumental:false,synced_lyrics:Some("[00:01]\n[00:02]".into()),plain_lyrics:None};
+        assert!(!timing_compatible(&record,200.0));assert!(matches!(result(record.clone(),200.0),LyricResult::NotFound));
+        let instrumental=Record{instrumental:true,synced_lyrics:None,..record};
+        assert!(matches!(result(instrumental.clone(),200.0),LyricResult::Instrumental));
+        assert!(matches!(result(instrumental,230.0),LyricResult::NotFound));
+    }
 
     fn red_hit(id: &str, title: &str, artist: &str, duration: f64) -> serde_json::Value {
         serde_json::json!({"isrc": id, "title": title, "artist": artist, "duration": duration})

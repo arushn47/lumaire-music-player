@@ -6,6 +6,6 @@ fn main() {
     }
     tauri_build::try_build(tauri_build::Attributes::new().plugin(
         "lumaire-android",
-        tauri_build::InlinedPlugin::new().commands(&["navigation", "register_listener", "remove_listener"]),
+        tauri_build::InlinedPlugin::new().commands(&["navigation", "register_listener", "remove_listener", "downloadNotification"]),
     )).expect("Failed to build Lumaire platform permissions")
 }

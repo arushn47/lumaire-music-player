@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { ChevronLeft, Loader2, Play, RefreshCw, Shuffle } from "lucide-react";
 import { loadJioChart } from "../../adapters/jiosaavn-charts";
-import type { CatalogTrack, ChartDetails } from "../../adapters/native";
+import { library, type CatalogTrack, type ChartDetails } from "../../adapters/native";
 import type { DiscoveryViewProps } from "./DiscoveryView";
 import { Artwork } from "../common";
 import { CatalogTrackList } from "../common/CatalogTrackList";
@@ -51,15 +51,20 @@ export function ChartView({
         if (active) setData(value);
       })
       .catch((err) => {
-        if (active) setError(err instanceof Error ? err.message : "This chart couldn't load right now. Retry or choose another chart.");
+        if (active) {
+          setData(null);
+          setError(err instanceof Error ? err.message : "This chart couldn't load right now. Retry or choose another chart.");
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
       });
+
     return () => {
       active = false;
     };
   }, [chartId, revision]);
+
 
   const offline = data?.tracks.every((track) =>
     savedTracks.some((saved) => saved.metadataSourceId === track.id && saved.offline && !saved.missing)

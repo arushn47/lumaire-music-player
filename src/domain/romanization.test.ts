@@ -25,6 +25,69 @@ describe("romanization quality and alignment", () => {
       expect(doc.lines[0].time).toBe(1000);
     },
   );
+
+
+
+  it("romanizes Telugu without consulting Devanagari scheme fields", async () => {
+    const doc = parseLyrics("కిట్టని చూపులుగా\nచుట్టాలంతో కొండరుమ్దాలిగా?");
+    const roman = await romanizeDocument(doc);
+    expect(Object.values(roman)).toHaveLength(2);
+    for (const value of Object.values(roman)) {
+      expect(value).toMatch(/[a-z]/i);
+      expect(value).not.toMatch(/[\u0c00-\u0c7f]/);
+    }
+  });
+  it("uses ASCII-friendly spellings for Devanagari and Bengali long vowels and diacritics", async () => {
+    const doc = parseLyrics("हाथों में चाँदनी, मैं हूँ\nবাংলা চাঁদ নীল পৃথিবী");
+    const roman = await romanizeDocument(doc);
+    expect(Object.values(roman)).toEqual([
+      "haathon men chaandanee, main hoon",
+      "baanglaa chaanda neela prithivee",
+    ]);
+    for (const value of Object.values(roman)) expect(value).toMatch(/^[\x00-\x7f]*$/);
+  });
+  it("preserves English text and punctuation in mixed-script lyrics", async () => {
+    const doc = parseLyrics("मैं café, hello!\nEnglish only");
+    const roman = await romanizeDocument(doc);
+    expect(roman[doc.lines[0].id]).toBe("main café, hello!");
+    expect(roman[doc.lines[1].id]).toBeUndefined();
+    expect(doc.lines.map(line => line.time)).toEqual([null, null]);
+  });
+  it("converts Devanagari nasal tildes and removes extra word-final schwas", async () => {
+    const doc = parseLyrics("मैं वहाँ से हूँ आया\nक्योंकि चाहिए उसे चाहिए मोरे दी\nरंग संगीता\nहर दम, करवाता लून भी मिलो\nये रंगता काजल तेरे");
+    const roman = await romanizeDocument(doc);
+    expect(Object.values(roman)).toEqual([
+      "main vahaan se hoon aayaa",
+      "kyonki chaahie use chaahie more dee",
+      "rang sangeetaa",
+      "har dam, karavaataa loon bhee milo",
+      "ye rangataa kaajal tere",
+    ]);
+    for (const value of Object.values(roman)) expect(value).not.toContain("~");
+  });
+  it("uses familiar Punjabi spellings and keeps decomposed diacritics out", async () => {
+    const doc = parseLyrics("ਪਾਣੀ ਚੰਨ ਰਾਤੀਂ");
+    const roman = await romanizeDocument(doc);
+    expect(Object.values(roman)).toEqual(["paanee channa raateen"]);
+    for (const value of Object.values(roman)) expect(value).toMatch(/^[\x00-\x7f]*$/);
+  });
+  it("keeps Tamil long vowels readable and removes academic marks", async () => {
+    const doc = parseLyrics("என் ஏக்கத்த எங்கணா மாத்திக்கிறியா\nபாத்துட்டியா\nநான் பாட்டுற தவிப்ப ரச்சிக்கிறியா\nகொன்னுட்டியே");
+    const roman = await romanizeDocument(doc);
+    expect(Object.values(roman)).toEqual([
+      "en eekkaththa engkanaa maaththikkiriyaa",
+      "paaththuttiyaa",
+      "naan paattura thavippa rachchikkiriyaa",
+      "konnuttiyee",
+    ]);
+    for (const value of Object.values(roman)) expect(value).not.toMatch(/[\u0300-\u036f]/);
+  });
+  it("simplifies Tamil ṉ/ṟ but retains Sanskrit ṉ in other scripts", async () => {
+    const doc = parseLyrics("என்\nञ");
+    const roman = await romanizeDocument(doc);
+    expect(roman[doc.lines[0].id]).toBe("en");
+    expect(roman[doc.lines[1].id]).toBe("ny");
+  });
   it("keeps Tamil short/long vowels and native consonants distinct, without false aspirates", async () => {
     const doc = parseLyrics(
       "காலை ஒளி\nதமிழ்\nக கா கி கீ கு கூ கெ கே கை கொ கோ கௌ",
@@ -39,7 +102,7 @@ describe("romanization quality and alignment", () => {
   it("handles shaping joiners and decomposed vowels without breaking conjuncts or Latin punctuation", async () => {
     const doc = parseLyrics("क्‍ष, friend!\nகொ");
     const roman = await romanizeDocument(doc);
-    expect(roman[doc.lines[0].id]).toBe("ksha, friend!");
+    expect(roman[doc.lines[0].id]).toBe("ksh, friend!");
     expect(roman[doc.lines[1].id]).toBe("ko");
   });
   it("automatically repairs exact legacy generated Tamil while preserving supplied text", async () => {
@@ -53,6 +116,7 @@ describe("romanization quality and alignment", () => {
   it("upgrades cached academic text but never changes Gemini, supplied text, timing or Latin spelling", async () => {
     const doc = parseLyrics("தமிழ் தமிழ் café\nHello");
     doc.romanisation[doc.lines[0].id] = "tamiḻ tamiḻ café";
+    doc.localRomanisation = { ...doc.romanisation };
     expect((await romanizeDocument(doc))[doc.lines[0].id]).toBe(
       "thamizh thamizh café",
     );

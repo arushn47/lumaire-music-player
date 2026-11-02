@@ -1,12 +1,31 @@
 import { expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
-import { PlayerBar, type PlayerBarProps } from "./PlayerBar";
+import { PlayerBar, TrackActionMenuItems, formatWordTruncatedTitle, type PlayerBarProps } from "./PlayerBar";
 import { defaults } from "../../domain/types";
+it('offers optional correction inside song actions and excludes local or offline recordings',()=>{
+  const noop=()=>{};
+  const props={track:{id:'youtube:g12hFFO6KCI',metadataSourceId:'saavn:M4t__2Pc',title:'Hola Amigo',artist:'KR$NA',album:'',format:'webm',fileName:'',duration:226,missing:false},tracks:[],downloads:{},session:defaults(),onSaveOnline:noop,onChoosePlaylist:noop,onFavorite:noop,onCancelDownload:noop,onDownloadTrack:noop,onDeleteOffline:noop};
+  expect(renderToStaticMarkup(<TrackActionMenuItems {...props} onWrongVersion={noop}/>)).toContain('Wrong version playing?');
+  expect(renderToStaticMarkup(<TrackActionMenuItems {...props}/>)).not.toContain('Wrong version playing?');
+  expect(renderToStaticMarkup(<TrackActionMenuItems {...props} track={{...props.track,offline:true}} onWrongVersion={noop}/>)).not.toContain('Wrong version playing?');
+  expect(renderToStaticMarkup(<TrackActionMenuItems {...props} track={{...props.track,id:'local-file',format:'mp3'}} onWrongVersion={noop}/>)).not.toContain('Wrong version playing?');
+  expect(renderToStaticMarkup(<TrackActionMenuItems {...props} track={{...props.track,id:'saavn:M4t__2Pc',format:'catalog'}} onWrongVersion={noop}/>)).toContain('Wrong version playing?');
+});
+it("truncates song titles with clean, word-aware ellipsis avoiding awkward cuts", () => {
+  expect(formatWordTruncatedTitle('Alaakaa Loova Unplugged (From "Devara Part 1") [Hindi]', 28))
+    .toBe("Alaakaa Loova Unplugged…");
+  expect(formatWordTruncatedTitle("Short Song Title", 28))
+    .toBe("Short Song Title");
+  expect(formatWordTruncatedTitle("A Long Title Without Parentheses Here", 24))
+    .toBe("A Long Title Without…");
+});
+
 it("caps immersive titles while keeping the full title available on hover", () => {
-  const title = 'Veezha Veera (From "OM Chapter 1: Udhiram – The Blood Wood") [Tamil]';
+  const title = 'Alaakaa Loova Unplugged (From "Devara Part 1") [Hindi]';
   const props = { tracks: [], session: defaults(), playback: {status: "paused", time: 0, duration: 200}, downloads: {}, track: {id: "fixture", title, artist: "Artist"} } as unknown as PlayerBarProps;
-  const html = renderToStaticMarkup(<PlayerBar {...props} expanded titleCharacterLimit={40}/>);
-  expect(html).toContain(`${title.slice(0, 40).trimEnd()}...`.replaceAll('"', '&quot;'));
+  const html = renderToStaticMarkup(<PlayerBar {...props} expanded titleCharacterLimit={28}/>);
+  expect(html).toContain("Alaakaa Loova Unplugged…");
+  expect(html).not.toContain('<strong dir="auto" title=');
   expect(html).toContain(title.replaceAll('"', '&quot;'));
 });
 it("offers expansion only on PC while keeping the mobile mini-player", () => {
@@ -181,6 +200,9 @@ it("preserves longer song titles and multiple artists on mobile playback control
   const html = renderToStaticMarkup(<PlayerBar {...props} onNavigateArtist={noop} />);
   expect(html).toContain("A Somewhat Longer Song Title For Testing");
   expect(html).not.toContain("A Somewhat Longer Song...");
-  expect(html).toContain(">Artist Three</button>");
+  expect(html).toContain("Artist Three");
+  expect(html).not.toContain(">Artist Three</button>");
+  const desktopHtml = renderToStaticMarkup(<PlayerBar {...props} mobile={false} onNavigateArtist={noop} />);
+  expect(desktopHtml).toContain(">Artist Two</button>");
 });
 

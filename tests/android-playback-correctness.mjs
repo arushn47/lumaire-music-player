@@ -7,7 +7,9 @@ import assert from 'node:assert/strict';
 
 const adb='C:/Users/ARUSH/AppData/Local/Android/Sdk/platform-tools/adb.exe';
 const pkg='app.lumaire.player.latency', video='aqz-KE-bpKQ', id=`youtube:${video}`;
-const output='test-results/android-playback-correctness.json';
+const label=process.argv[2]||'combined-fix';
+assert(/^[\w-]+$/.test(label),'Invalid benchmark label');
+const output=process.argv[2]?`test-results/android-playback-correctness-${label}.json`:'test-results/android-playback-correctness.json';
 const report={startedAt:new Date().toISOString(),checks:[],failures:[]};
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function device(args,required=true){const r=spawnSync(adb,args,{encoding:'utf8',windowsHide:true,timeout:30000});if(required)assert.equal(r.status,0,(r.stderr||r.stdout).slice(-500));return r.stdout.trim();}
@@ -17,13 +19,13 @@ const state=()=>invoke('android_playback',{action:'state'});
 const diagnostic=()=>invoke('android_source',{operation:'diagnostics'});
 const safe=error=>String(error).replace(/https?:\/\/\S+/g,'[URL]').slice(0,1200);
 async function until(predicate,seconds=30){const end=performance.now()+seconds*1000;while(performance.now()<end){const s=await state();if(predicate(s))return s;if(s.status==='error')throw Error(s.error);await delay(50);}throw Error('Native playback state timeout');}
-async function check(name,operation){try{report.checks.push({name,evidence:await operation()});console.log(`PASS ${name}`);}catch(error){report.failures.push({name,error:safe(error)});console.log(`FAIL ${name}: ${safe(error)}`);await invoke('android_playback',{action:'cancel'}).catch(()=>{});}writeFileSync(output,JSON.stringify(report,null,2));}
+async function check(name,operation){const started=performance.now();try{report.checks.push({name,evidence:await operation(),elapsedMs:performance.now()-started});console.log(`PASS ${name}`);}catch(error){report.failures.push({name,error:safe(error),elapsedMs:performance.now()-started});console.log(`FAIL ${name}: ${safe(error)}`);await invoke('android_playback',{action:'cancel'}).catch(()=>{});}writeFileSync(output,JSON.stringify(report,null,2));}
 async function worker(){for(let n=0;n<60;n++){if(device(['shell','pidof',`${pkg}:resolver`],false))return;await delay(50);}throw Error('No active resolver worker was observed');}
 async function loadAudio(){const before=await diagnostic();await invoke('android_playback',{action:'load',id,autoplay:true});const after=await diagnostic();if(after.resolverCacheHits===before.resolverCacheHits)cacheFilledAt=performance.now();return until(s=>s.id===id&&s.status==='playing'&&s.time>.05);}
 try{
  const installed=device(['shell','pm','path',pkg]).split('\n').find(x=>x.endsWith('/base.apk')).replace(/^package:/,'');
  report.apkSha256=device(['shell','sha256sum',installed]).split(/\s/)[0];
- assert.equal(report.apkSha256,createHash('sha256').update(readFileSync('.test-data/latency/combined-fix-android.apk')).digest('hex'));
+ assert.equal(report.apkSha256,createHash('sha256').update(readFileSync(`.test-data/latency/${label}-android.apk`)).digest('hex'));
  device(['shell','input','keyevent','224']);device(['shell','wm','dismiss-keyguard']);
  device(['shell','am','force-stop',pkg]);device(['shell','am','start','-n',`${pkg}/app.lumaire.player.MainActivity`]);await delay(1200);
  const pid=device(['shell','pidof',pkg]).split(' ')[0];port=device(['forward','tcp:0',`localabstract:webview_devtools_remote_${pid}`]);
@@ -77,8 +79,8 @@ try{
  await check('Expired in-memory stream entries trigger a fresh real extraction',async()=>{
  assert(cacheFilledAt>0);const deadline=cacheFilledAt+120500;
  while(performance.now()<deadline){const remaining=deadline-performance.now();console.log(`Waiting ${Math.ceil(remaining/1000)}s for real cache expiry`);await delay(Math.min(30000,remaining));}
- const before=await diagnostic();const result=await invoke('android_source',{operation:'resolve',videoId:video});const after=await diagnostic();
- assert.equal(result.videoCodec,'none');assert.equal(after.resolverExecutions,before.resolverExecutions+1);return {before:before.resolverExecutions,after:after.resolverExecutions};
+ const before=await diagnostic(),started=performance.now();const result=await invoke('android_source',{operation:'resolve',videoId:video});const extractionMs=performance.now()-started,after=await diagnostic();
+ assert.equal(result.videoCodec,'none');assert.equal(after.resolverExecutions,before.resolverExecutions+1);return {before:before.resolverExecutions,after:after.resolverExecutions,extractionMs};
  });
  const afterLibrary=await invoke('load_library');assert.deepEqual(afterLibrary.tracks.map(t=>t.id),[tone.id]);
  report.passed=report.failures.length===0;

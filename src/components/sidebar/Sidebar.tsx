@@ -34,6 +34,7 @@ export interface SidebarProps {
   queueOpen?: boolean;
   onToggleQueue?: () => void;
   onOpenSync?: () => void;
+  onSearch?: () => void;
   onResizeStart?: (e: React.PointerEvent<HTMLDivElement>) => void;
   onResizeReset?: () => void;
 }
@@ -50,6 +51,7 @@ export function Sidebar({
   queueOpen,
   onToggleQueue,
   onOpenSync,
+  onSearch,
   onResizeStart,
   onResizeReset,
 }: SidebarProps) {
@@ -270,6 +272,17 @@ export function Sidebar({
         </a>
 
         <div className="mobile-header-actions">
+          {onSearch && (
+            <button
+              type="button"
+              className={`mobile-header-btn ${["search", "discover"].includes(view) ? "selected" : ""}`}
+              onClick={onSearch}
+              aria-label="Search"
+              title="Search"
+            >
+              <Search size={20} />
+            </button>
+          )}
           {onOpenSync && <button type="button" className="mobile-header-btn" onClick={onOpenSync} aria-label="Sync playlists & devices" title="Sync playlists & devices"><RefreshCw size={20} /></button>}
           {onToggleQueue && (
             <button

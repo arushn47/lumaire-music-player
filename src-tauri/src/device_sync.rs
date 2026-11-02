@@ -33,6 +33,8 @@ pub struct Packet {
     pub history: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub favorites: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkpoint: Option<PlaybackCheckpoint>,
 }
 #[derive(Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -44,6 +46,8 @@ pub struct Reply {
     pub history: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub favorites: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checkpoint: Option<PlaybackCheckpoint>,
 }
 
 pub fn initialize(db: &Connection) -> Result<()> {
@@ -51,7 +55,9 @@ pub fn initialize(db: &Connection) -> Result<()> {
         CREATE TABLE IF NOT EXISTS sync_cells(key TEXT PRIMARY KEY,clock INTEGER NOT NULL,device TEXT NOT NULL,value TEXT NOT NULL,revision INTEGER NOT NULL);
         CREATE INDEX IF NOT EXISTS sync_revision ON sync_cells(revision);
         CREATE TABLE IF NOT EXISTS sync_peers(device TEXT PRIMARY KEY,sent INTEGER NOT NULL,received INTEGER NOT NULL,history INTEGER NOT NULL);
-        CREATE TABLE IF NOT EXISTS sync_host(id INTEGER PRIMARY KEY CHECK(id=1),port INTEGER NOT NULL,token TEXT NOT NULL);") .map_err(err)?;
+        CREATE TABLE IF NOT EXISTS sync_host(id INTEGER PRIMARY KEY CHECK(id=1),port INTEGER NOT NULL,token TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS playback_checkpoints(device_id TEXT PRIMARY KEY,checkpoint TEXT NOT NULL,captured_at INTEGER NOT NULL,updated_at INTEGER NOT NULL);
+        CREATE TABLE IF NOT EXISTS sync_peer_info(device_id TEXT PRIMARY KEY,name TEXT NOT NULL DEFAULT '',last_seen INTEGER NOT NULL);") .map_err(err)?;
     db.execute(
         "INSERT OR IGNORE INTO sync_state(id,device) VALUES(1,?1)",
         [uuid::Uuid::new_v4().to_string()],
@@ -328,7 +334,11 @@ pub fn merge(db: &Connection, cells: &[Cell], history: bool) -> Result<bool> {
                 continue;
             }
             if (cell.clock, &cell.device) == (old.clock, &old.device) {
-                if cell.value != old.value {
+                // Old databases may omit fields added to portable track metadata.
+                // Compare both versions using the current validation/defaults.
+                let mut normalized_old = old.clone();
+                validate(&mut normalized_old)?;
+                if cell.value != normalized_old.value {
                     return Err("Conflicting sync versions; existing data preserved.".into());
                 }
                 continue;
@@ -399,13 +409,19 @@ pub fn merge(db: &Connection, cells: &[Cell], history: bool) -> Result<bool> {
     Ok(changed)
 }
 pub fn local(db: &Connection, k: String, value: Value) -> Result<()> {
-    let state = state(db, false)?;
+    // Reserve a unique Lamport version in SQLite itself; a read-then-increment
+    // lets concurrent local writes reuse the same (clock, device) pair.
+    let (clock, device): (i64, String) = db.query_row(
+        "UPDATE sync_state SET clock=clock+1 WHERE id=1 RETURNING clock,device",
+        [],
+        |row| Ok((row.get(0)?, row.get(1)?)),
+    ).map_err(err)?;
     merge(
         db,
         &[Cell {
             key: k,
-            clock: state.clock + 1,
-            device: state.device_id,
+            clock,
+            device,
             value,
         }],
         true,
@@ -474,6 +490,7 @@ pub fn page_favorites(db: &Connection, since: i64, history: bool, favorites: boo
         more,
         history,
         favorites: None,
+        checkpoint: None,
     })
 }
 pub fn handle(db: &mut Connection, path: &str, bytes: &[u8]) -> Result<Vec<u8>> {
@@ -499,8 +516,59 @@ pub fn handle(db: &mut Connection, path: &str, bytes: &[u8]) -> Result<Vec<u8>> 
     let favorites = v3 && status.favorites_enabled && packet.favorites == Some(true);
     let cells: Vec<_> = packet.cells.into_iter().filter(|c| favorites || !favorite_key(&c.key)).collect();
     merge(&tx, &cells, history)?;
+    
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    let peer_name = packet.checkpoint.as_ref().and_then(|c| c.device_name.clone()).unwrap_or_default();
+    let _ = tx.execute(
+        "INSERT INTO sync_peer_info(device_id, name, last_seen) VALUES(?1, ?2, ?3)
+         ON CONFLICT(device_id) DO UPDATE SET 
+         last_seen=excluded.last_seen,
+         name=CASE WHEN excluded.name != '' THEN excluded.name ELSE sync_peer_info.name END",
+        params![packet.device_id, peer_name, now_ms],
+    );
+    
+    // Save received checkpoint if present
+    if let Some(mut received_checkpoint) = packet.checkpoint {
+        if validate_checkpoint(&mut received_checkpoint).is_ok() {
+            let serialized = serde_json::to_string(&received_checkpoint).unwrap_or_default();
+            if serialized.len() <= 500_000 {
+                let _ = tx.execute(
+                    "INSERT INTO playback_checkpoints(device_id, checkpoint, captured_at, updated_at) 
+                     VALUES(?1, ?2, ?3, ?4) 
+                     ON CONFLICT(device_id) DO UPDATE SET 
+                     checkpoint=excluded.checkpoint, 
+                     captured_at=excluded.captured_at, 
+                     updated_at=excluded.updated_at
+                     WHERE excluded.captured_at >= playback_checkpoints.captured_at",
+                    params![
+                        received_checkpoint.device_id,
+                        serialized,
+                        received_checkpoint.captured_at,
+                        now_ms
+                    ],
+                );
+            }
+        }
+    }
+    
     let mut response = page_favorites(&tx, packet.since, history, favorites, 100)?;
     if v3 { response.favorites = Some(favorites); }
+    
+    // Include our checkpoint in response
+    response.checkpoint = if v3 {
+        tx.query_row(
+            "SELECT checkpoint FROM playback_checkpoints WHERE device_id=?1",
+            [status.device_id.clone()],
+            |row| row.get::<_, String>(0)
+        ).optional().map_err(err)?
+        .and_then(|json| serde_json::from_str(&json).ok())
+    } else {
+        None
+    };
+    
     tx.commit().map_err(err)?;
     serde_json::to_vec(&response).map_err(err)
 }
@@ -565,14 +633,276 @@ pub fn accept(db: &mut Connection, reply: Reply, sent: i64) -> Result<()> {
     let favorites = state(&tx, false)?.favorites_enabled && reply.favorites == Some(true);
     let cells: Vec<_> = reply.cells.into_iter().filter(|c| favorites || !favorite_key(&c.key)).collect();
     merge(&tx, &cells, enabled)?;
+    
+    let now_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() as i64;
+    let peer_name = reply.checkpoint.as_ref().and_then(|c| c.device_name.clone()).unwrap_or_default();
+
+    // Save received checkpoint if present
+    if let Some(mut received_checkpoint) = reply.checkpoint {
+        if validate_checkpoint(&mut received_checkpoint).is_ok() {
+            let serialized = serde_json::to_string(&received_checkpoint).unwrap_or_default();
+            if serialized.len() <= 500_000 {
+                let _ = tx.execute(
+                    "INSERT INTO playback_checkpoints(device_id, checkpoint, captured_at, updated_at) 
+                     VALUES(?1, ?2, ?3, ?4) 
+                     ON CONFLICT(device_id) DO UPDATE SET 
+                     checkpoint=excluded.checkpoint, 
+                     captured_at=excluded.captured_at, 
+                     updated_at=excluded.updated_at
+                     WHERE excluded.captured_at >= playback_checkpoints.captured_at",
+                    params![
+                        received_checkpoint.device_id,
+                        serialized,
+                        received_checkpoint.captured_at,
+                        now_ms
+                    ],
+                );
+            }
+        }
+    }
+    
     tx.execute("INSERT INTO sync_peers(device,sent,received,history) VALUES(?1,?2,?3,?4) ON CONFLICT(device) DO UPDATE SET sent=excluded.sent,received=excluded.received,history=excluded.history",params![reply.device_id,sent,reply.cursor,i64::from(enabled) | (i64::from(favorites) << 1)]).map_err(err)?;
+    let _ = tx.execute(
+        "INSERT INTO sync_peer_info(device_id, name, last_seen) VALUES(?1, ?2, ?3)
+         ON CONFLICT(device_id) DO UPDATE SET 
+         last_seen=excluded.last_seen,
+         name=CASE WHEN excluded.name != '' THEN excluded.name ELSE sync_peer_info.name END",
+        params![reply.device_id, peer_name, now_ms],
+    );
     tx.commit().map_err(err)
+}
+
+// Playback checkpoint persistence
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PlaybackCheckpoint {
+    pub version: i64,
+    pub id: String,
+    pub device_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_name: Option<String>,
+    pub captured_at: i64,
+    pub playing: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub current_entry_id: Option<String>,
+    pub position: f64,
+    pub queue: Vec<CheckpointQueueEntry>,
+    pub shuffle_order: Vec<String>,
+    pub shuffle: bool,
+    pub repeat: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub playlist_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub playlist_name: Option<String>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CheckpointQueueEntry {
+    pub id: String,
+    pub track_id: String,
+    pub metadata: crate::Track,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub requested: Option<bool>,
+}
+
+fn validate_checkpoint(checkpoint: &mut PlaybackCheckpoint) -> Result<()> {
+    if checkpoint.version != 1 {
+        return Err(format!("Unsupported checkpoint version: {}", checkpoint.version).into());
+    }
+    if checkpoint.device_id.is_empty() || uuid::Uuid::parse_str(&checkpoint.device_id).is_err() {
+        return Err("Invalid checkpoint device ID.".into());
+    }
+    if checkpoint.captured_at <= 0 || checkpoint.captured_at > 9_007_199_254_740_991 {
+        return Err("Invalid checkpoint timestamp.".into());
+    }
+    if checkpoint.position < 0.0 || checkpoint.position > 86400.0 || !checkpoint.position.is_finite() {
+        return Err("Invalid checkpoint position.".into());
+    }
+    if !["off", "all", "one"].contains(&checkpoint.repeat.as_str()) {
+        return Err("Invalid repeat mode.".into());
+    }
+    if checkpoint.queue.is_empty() || checkpoint.queue.len() > 200 {
+        return Err("Invalid checkpoint queue size.".into());
+    }
+    
+    // Validate all queue entries have portable tracks
+    for entry in &mut checkpoint.queue {
+        if entry.id.is_empty() || entry.track_id.is_empty() {
+            return Err("Invalid checkpoint queue entry.".into());
+        }
+        crate::nearby::clean_track(&mut entry.metadata)?;
+        if entry.metadata.id != entry.track_id {
+            return Err("Checkpoint queue entry track ID mismatch.".into());
+        }
+    }
+    
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn save_playback_checkpoint(app: AppHandle, checkpoint: Value) -> Result<()> {
+    work(app, move |_, db| {
+        let mut cp: PlaybackCheckpoint = serde_json::from_value(checkpoint)
+            .map_err(|e| format!("Invalid checkpoint format: {}", e))?;
+        
+        let local_device_id = state(db, false)?.device_id;
+        if cp.device_id != local_device_id {
+            let _ = db.execute("DELETE FROM playback_checkpoints WHERE device_id=?1", params![cp.device_id]);
+        }
+        cp.device_id = local_device_id;
+        
+        validate_checkpoint(&mut cp)?;
+        
+        let serialized = serde_json::to_string(&cp).map_err(err)?;
+        if serialized.len() > 500_000 {
+            return Err("Checkpoint exceeds size limit.".into());
+        }
+        
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        
+        db.execute(
+            "INSERT INTO playback_checkpoints(device_id, checkpoint, captured_at, updated_at) 
+             VALUES(?1, ?2, ?3, ?4) 
+             ON CONFLICT(device_id) DO UPDATE SET 
+             checkpoint=excluded.checkpoint, 
+             captured_at=excluded.captured_at, 
+             updated_at=excluded.updated_at",
+            params![
+                cp.device_id,
+                serialized,
+                cp.captured_at,
+                now_ms
+            ],
+        )
+        .map_err(err)?;
+        
+        Ok(())
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn get_playback_checkpoints(app: AppHandle) -> Result<Vec<PlaybackCheckpoint>> {
+    work(app, move |_, db| {
+        let now_ms = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as i64;
+        let one_hour_ago = now_ms - 3_600_000;
+        let _ = db.execute("DELETE FROM playback_checkpoints WHERE captured_at < ?1", params![one_hour_ago]);
+        let mut stmt = db
+            .prepare("SELECT checkpoint FROM playback_checkpoints ORDER BY updated_at DESC")
+            .map_err(err)?;
+        
+        let checkpoints = stmt
+            .query_map([], |row| {
+                let data: String = row.get(0)?;
+                Ok(data)
+            })
+            .map_err(err)?
+            .collect::<std::result::Result<Vec<_>, _>>()
+            .map_err(err)?
+            .into_iter()
+            .filter_map(|json_str| serde_json::from_str(&json_str).ok())
+            .collect();
+        
+        Ok(checkpoints)
+    })
+    .await
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SyncPeer {
+    pub device_id: String,
+    pub name: String,
+    pub last_seen: i64,
+}
+
+#[tauri::command]
+pub async fn get_sync_peer(app: AppHandle) -> Result<Option<SyncPeer>> {
+    work(app, move |_, db| {
+        let peer = db.query_row(
+            "SELECT device_id, name, last_seen FROM sync_peer_info ORDER BY last_seen DESC LIMIT 1",
+            [],
+            |row| Ok(SyncPeer {
+                device_id: row.get(0)?,
+                name: row.get(1)?,
+                last_seen: row.get(2)?,
+            })
+        ).optional().map_err(err)?;
+        Ok(peer)
+    })
+    .await
+}
+
+#[tauri::command]
+pub async fn delete_playback_checkpoint(app: AppHandle, device_id: String) -> Result<()> {
+    work(app, move |_, db| {
+        db.execute(
+            "DELETE FROM playback_checkpoints WHERE device_id=?1",
+            [device_id],
+        )
+        .map_err(err)?;
+        Ok(())
+    })
+    .await
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn db() -> Connection {
+    #[test]
+    #[ignore = "requires a private local database snapshot via LUMAIRE_SYNC_REPRO_DB"]
+    fn copied_legacy_sync_cells_can_be_replayed_without_conflict() {
+        let source = Connection::open_with_flags(std::env::var("LUMAIRE_SYNC_REPRO_DB").expect("snapshot path"), rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY).unwrap();
+        let cells = source.prepare("SELECT key,clock,device,value FROM sync_cells").unwrap().query_map([], |row| Ok(Cell{key:row.get(0)?,clock:row.get(1)?,device:row.get(2)?,value:serde_json::from_str(&row.get::<_,String>(3)?).unwrap()})).unwrap().collect::<std::result::Result<Vec<_>,_>>().unwrap();
+        let db = db();
+        for cell in cells.iter().filter(|cell| !history_key(&cell.key)) {
+            db.execute("INSERT INTO sync_cells(key,clock,device,value,revision) VALUES(?1,?2,?3,?4,1)",params![cell.key,cell.clock,cell.device,cell.value.to_string()]).unwrap();
+            assert!(!merge(&db,&[cell.clone()],false).unwrap());
+        }
+    }
+
+    #[test]
+    fn same_version_legacy_tracks_remain_idempotent_after_schema_upgrade() {
+        for kind in ["entry", "fav-track"] {
+            let db = db();
+            let track = json!({"id":"youtube:abcdefghijk","title":"Song","artist":"Artist","album":"","duration":180.0,"fileName":"","missing":false,"format":"YouTube","source":{"providerId":"youtube","sourceId":"abcdefghijk","pageUrl":"https://www.youtube.com/watch?v=abcdefghijk","license":"","licenseUrl":"","attribution":"Artist"}});
+            let k = if kind == "entry" { key(&[kind,"mix","entry"]) } else { key(&[kind,"youtube:abcdefghijk"]) };
+            let mut cell = Cell { key:k,clock:1,device:state(&db,false).unwrap().device_id,value:if kind=="entry" {json!({"track":track,"position":0})} else {track} };
+            merge(&db,&[cell.clone()],false).unwrap();
+            let mut stored = get(&db,&cell.key).unwrap().unwrap();
+            let track = if kind=="entry" { &mut stored.value["track"] } else { &mut stored.value };
+            track.as_object_mut().unwrap().remove("recordingMetadata");
+            db.execute("UPDATE sync_cells SET value=?1 WHERE key=?2",params![stored.value.to_string(),cell.key]).unwrap();
+            assert!(!merge(&db,&[cell.clone()],false).unwrap());
+            let track = if kind=="entry" { &mut cell.value["track"] } else { &mut cell.value };
+            track["title"] = json!("Different song");
+            assert!(merge(&db,&[cell],false).unwrap_err().contains("Conflicting sync versions"));
+        }
+    }
+
+    #[test]
+    fn repeated_local_updates_to_one_key_get_distinct_versions() {
+        let db = db();
+        let k = key(&["name", "same-playlist"]);
+        local(&db, k.clone(), json!("Before")).unwrap();
+        local(&db, k.clone(), json!("After")).unwrap();
+        let cell = get(&db, &k).unwrap().unwrap();
+        assert_eq!(cell.value, json!("After"));
+        assert_eq!(cell.clock, 2);
+        assert_eq!(state(&db, false).unwrap().clock, 2);
+    }
+
+    pub fn db() -> Connection {
         let mut db = Connection::open_in_memory().unwrap();
         crate::initialize(&mut db).unwrap();
         db
@@ -594,6 +924,7 @@ mod tests {
                 cells: outgoing.cells,
                 history,
                 favorites: None,
+                checkpoint: None,
             };
             let raw = handle(
                 b,
@@ -629,6 +960,7 @@ mod tests {
             cells: outgoing.cells,
             history: false,
             favorites: None,
+            checkpoint: None,
         };
         // The server commits but its acknowledgement is lost. Reconnect resends safely.
         handle(
@@ -764,6 +1096,7 @@ mod tests {
             cells,
             history: false,
             favorites: None,
+            checkpoint: None,
         };
         let raw = serde_json::to_vec(&packet).unwrap();
         assert!(handle(&mut b, "POST /v2/sync HTTP/1.1", &raw[..raw.len() / 2]).is_err());
@@ -809,7 +1142,7 @@ mod tests {
             let enabled = state(a, false).unwrap().favorites_enabled && state(b, false).unwrap().favorites_enabled;
             let (sent, received) = peer_favorites(a, &state(b, false).unwrap().device_id, false, enabled).unwrap();
             let outgoing = page_favorites(a, sent, false, enabled, 100).unwrap();
-            let packet = Packet { device_id: state(a,false).unwrap().device_id, since: received, cells: outgoing.cells, history: false, favorites: Some(enabled) };
+            let packet = Packet { device_id: state(a,false).unwrap().device_id, since: received, cells: outgoing.cells, history: false, favorites: Some(enabled), checkpoint: None };
             let raw = handle(b,"POST /v3/sync HTTP/1.1",&serde_json::to_vec(&packet).unwrap()).unwrap();
             let reply: Reply = serde_json::from_slice(&raw).unwrap();
             let more = outgoing.more || reply.more;
@@ -893,7 +1226,7 @@ mod tests {
             ("fav-artist","saavn:artist:12",json!({"id":"saavn:artist:13","name":"Wrong"})),
             ("fav-album","file:///secret",json!({"id":"file:///secret","title":"Bad","artist":"Bad"})),
         ] {
-            let packet = Packet { device_id:device.clone(),since:0,history:false,favorites:Some(true),cells:vec![
+            let packet = Packet { device_id:device.clone(),since:0,history:false,favorites:Some(true),checkpoint:None,cells:vec![
                 Cell{key:key(&["name","mix"]),clock:1,device:device.clone(),value:json!("Mix")},
                 Cell{key:key(&[kind,id]),clock:2,device:device.clone(),value},
             ]};
@@ -902,3 +1235,8 @@ mod tests {
         }
     }
 }
+
+
+#[cfg(test)]
+#[path = "device_sync_checkpoint_tests.rs"]
+mod checkpoint_tests;

@@ -6,6 +6,13 @@ import org.json.JSONObject
 
 /** Small IPC boundary. Neither signed URLs nor diagnostics are persisted. */
 class ResolverClient(private val context: Context) {
+    companion object {
+        private var shared: ResolverClient? = null
+        fun shared(context: Context): ResolverClient {
+            check(Looper.myLooper() == Looper.getMainLooper())
+            return shared ?: ResolverClient(context.applicationContext).also { shared = it }
+        }
+    }
     private val handler = Handler(Looper.getMainLooper())
     private var generation = 0
     private var connection: ServiceConnection? = null

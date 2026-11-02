@@ -4,6 +4,16 @@ src-tauri/target/
 .tools/
 .test-data/
 test-results/
+
+# Research artifacts (audio files, cached features, experiment results)
+research/test-tracks/*.mp3
+research/test-tracks/*.m4a
+research/test-tracks/*.flac
+research/test-tracks/*.wav
+research/test-tracks/*.ogg
+research/test-tracks/labels.csv
+research/features.json
+research/phase1-results.json
 *.log
 *.tsbuildinfo
 
@@ -39,7 +49,11 @@ releases/
 .kiro/
 
 scratch/
-scripts/
+.agents/
+research/
+brag-output-*/
+scripts/*
+tests/
 
 .codex-remote-attachments/
 
@@ -55,3 +69,6 @@ scripts/
 *.keystore
 *.apk
 *.idsig
+
+# User-provided conversation attachments are not release source.
+.codex-attachments/

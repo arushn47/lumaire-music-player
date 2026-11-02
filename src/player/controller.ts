@@ -1,7 +1,12 @@
-import { playbackEvent } from "./diagnostics";
+import { measurePlayback, playbackEvent } from "./diagnostics";
 import { registerAudioElement } from "./audio-analyser";
 
 export type Playback = {
+  nativeQueueRevision?: number;
+  nativeQueueEpoch?: string;
+  nativeStateAt?: number;
+  nativeHistoryRevision?: number;
+  nativeQueue?: { epoch?: string; revision: number; session: Pick<import('../domain/types').Session, 'queue' | 'queueTracks' | 'currentId' | 'position' | 'shuffleOrder'> };
   autoplay?: boolean;
   /** Stable media identity for observers; never a resolved stream URL. */
   trackId?: string | null;
@@ -16,7 +21,7 @@ export type Playback = {
   error: string | null;
 };
 
-type Resolver = (id: string, retry?: boolean) => Promise<string>;
+type Resolver = (id: string, retry?: boolean, alternative?: boolean) => Promise<string>;
 
 export class PlaybackController {
   readonly audio: HTMLAudioElement =
@@ -28,7 +33,7 @@ export class PlaybackController {
   private preciseClock = false;
   private frame: number | null = null;
   private loadTimer: ReturnType<typeof setTimeout> | null = null;
-  private retried = false;
+  private retries = 0;
   private recovering = false;
   private sourceGeneration = 0;
   private listeners = new Set<(state: Playback) => void>();
@@ -50,7 +55,7 @@ export class PlaybackController {
     );
     this.audio.addEventListener("playing", () => {
       this.clearLoadTimer();
-      playbackEvent({ trackId: this.state.trackId || "", stage: "playing" });
+      playbackEvent({ trackId: this.state.trackId || "", stage: "playing", playbackId: this.state.playbackId });
       this.update({ status: "playing", error: null });
       this.startClock();
     });
@@ -131,30 +136,31 @@ export class PlaybackController {
   private async recoverSource(reason: string) {
     if (this.recovering) return;
     this.clearLoadTimer();
-    if (this.retried || !this.state.trackId?.startsWith("youtube:")) {
+    if (this.retries >= 2 || !this.state.trackId?.startsWith("youtube:")) {
       this.update({ status: "error", error: `${reason}. Retry playback, check your connection, or choose another source.` });
       playbackEvent({ trackId: this.state.trackId || "", stage: "engine-failed", reason });
       return;
     }
-    this.retried = true;
+    this.retries++;
     this.recovering = true;
     playbackEvent({ trackId: this.state.trackId, stage: "engine-retry", reason });
     const generation = this.generation;
-    try { await this.attachSource(this.state.trackId, generation, true, this.state.autoplay || false, this.state.time); }
+    try { await this.attachSource(this.state.trackId, generation, true, this.state.autoplay || false, this.state.time, this.retries === 2); }
     finally { if (generation === this.generation) this.recovering = false; }
   }
-  private async attachSource(id: string, generation: number, retry: boolean, autoplay: boolean, position: number) {
+  private async attachSource(id: string, generation: number, retry: boolean, autoplay: boolean, position: number, alternative = false) {
     const sourceGeneration = ++this.sourceGeneration;
     this.update({ status: "loading", error: null });
     try {
-      const url = await this.resolve(id, retry);
+      const url = await measurePlayback({ trackId: id, stage: "source-request", playbackId: this.state.playbackId }, () => alternative ? this.resolve(id, true, true) : this.resolve(id, retry));
       if (generation !== this.generation || sourceGeneration !== this.sourceGeneration) return;
+      const attachedAt = performance.now();
       this.audio.onloadedmetadata = () => {
         if (generation !== this.generation || sourceGeneration !== this.sourceGeneration) return;
         this.clearLoadTimer();
         this.audio.currentTime = Math.min(position, Number.isFinite(this.audio.duration) ? this.audio.duration : position);
         this.update({ status: "paused", duration: this.audio.duration });
-        playbackEvent({ trackId: id, stage: "audio-loaded" });
+        playbackEvent({ trackId: id, stage: "audio-loaded", playbackId: this.state.playbackId, durationMs: performance.now() - attachedAt });
         if (autoplay) void this.play();
       };
       this.audio.src = url;
@@ -165,14 +171,14 @@ export class PlaybackController {
       if (generation === this.generation && sourceGeneration === this.sourceGeneration) {
         this.clearLoadTimer();
         this.update({ status: "error", error: error instanceof Error ? error.message : String(error) });
-        playbackEvent({ trackId: id, stage: "resolution-failed" });
+        playbackEvent({ trackId: id, stage: "resolution-failed", playbackId: this.state.playbackId });
       }
     }
   }
   beginLoading(id: string, autoplay = false, position = 0) {
     ++this.generation;
     this.clearLoadTimer();
-    this.retried = false;
+    this.retries = 0;
     this.recovering = false;
     this.audio.onloadedmetadata = null;
     this.audio.pause();
@@ -189,6 +195,7 @@ export class PlaybackController {
       duration: 0,
       error: null,
     });
+    playbackEvent({ trackId: id, stage: "selection", playbackId: this.state.playbackId });
     return this.state.playbackId!;
   }
   failLoading(playbackId: string, error: string, autoplay = false) {

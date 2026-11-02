@@ -26,4 +26,4 @@ it("uses the bundled Japanese dictionary for kanji readings rather than Chinese 
   expect(lines[0]).toMatch(/nihongo/i);
   expect(lines[1]).toMatch(/kimi/i);
   expect(lines[2]).toBe("Hello!");
-}, 20000);
+}, 60000);

@@ -20,6 +20,7 @@ import {
   alignVariant,
   estimatedFollowLine,
   normalizeCachedLyrics,
+  lyricsVersionMatches,
   upgradeSyncedLyrics,
   parseLyrics,
   synchronizedLyrics,
@@ -337,7 +338,7 @@ export function useLyricsEngine({
     }
     const id = track.id;
     const originalCached = sessionRef.current.lyrics[id];
-    const cached = originalCached
+    const cached = originalCached && lyricsVersionMatches(originalCached,track.title)
       ? normalizeCachedLyrics(originalCached, lyricDuration)
       : undefined;
     if (cached) {
@@ -362,11 +363,11 @@ export function useLyricsEngine({
       update(s => {
         const current = s.lyrics[id];
         if (result.status !== "found" || (current && current.id !== originalCached?.id)) return s;
-        const next = current ? upgradeSyncedLyrics(current, result.doc, lyricDuration) : result.doc;
+        const next = current && lyricsVersionMatches(current,track.title) ? upgradeSyncedLyrics(current, result.doc, lyricDuration) : result.doc;
         return next === current ? s : { ...s, lyrics: { ...s.lyrics, [id]: next } };
       });
       const attached = sessionRef.current.lyrics[id];
-      setLyricLookup(attached ? { status: "found", doc: attached } : result);
+      setLyricLookup(attached && lyricsVersionMatches(attached,track.title) ? { status: "found", doc: attached } : result);
     });
     return () => {
       cancelled = true;

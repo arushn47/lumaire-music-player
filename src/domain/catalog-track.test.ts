@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CatalogTrack, YtdlpSearchResult } from "../adapters/native";
-import { canonicalArtistNames, canonicalTrack, resolveCatalogSource } from "./catalog-track";
+import { canonicalArtistNames, canonicalTrack, resolveCatalogSource, resolveCatalogSources } from "./catalog-track";
 import { youtubeTrack } from "./online-track";
 
 const catalog: CatalogTrack = {
@@ -22,6 +22,36 @@ const video: YtdlpSearchResult = {
   duration: 190,
   thumbnail: "https://i.ytimg.com/video.jpg",
 };
+
+it('collects distinct verified alternatives and rejects mismatched versions',async()=>{
+  const good={...video,duration:180,track:'Sensitive',artist:'KR$NA, Seedhe Maut'};
+  const search=vi.fn().mockResolvedValue([good,good,{...good,id:'lmnopqrstuv'},{...good,id:'01234567890',title:'Sensitive (Live)'}]);
+  const verify=vi.fn().mockResolvedValue({duration:180,track:'Sensitive',artist:'KR$NA, Seedhe Maut'});
+  const rows=await resolveCatalogSources(catalog,search,{verify},2);
+  expect(rows.map(row=>row.id)).toEqual(['abcdefghijk','lmnopqrstuv']);expect(verify).toHaveBeenCalledTimes(2);
+});
+it('recovers Naatu Naatu using extracted performer credits, not the uploader name',async()=>{
+  const song={...catalog,id:'saavn:-JkPBIE7',title:'Naatu Naatu',artist:'Rahul Sipligunj, Kaala Bhairava',artists:[],duration:214};
+  const candidate={id:'AbaAxgufFA8',title:'Naatu Naatu',channel:'Sipligunj’s music',duration:215,thumbnail:null};
+  const verify=vi.fn().mockResolvedValue({track:'Naatu Naatu',artist:'Rahul Sipligunj, Kaala Bhairava, M.M. Keeravaani, Chandrabose',duration:214});
+  expect((await resolveCatalogSource(song,vi.fn().mockResolvedValue([candidate]),{verify})).id).toBe(candidate.id);
+});
+it('does not accept a missing-credit upload without confirmed extracted performers and caps preflights',async()=>{
+  const candidates=['abcdefghijk','lmnopqrstuv','01234567890','11111111111'].map(id=>({...video,id,title:'Sensitive',channel:'Unrelated uploader',duration:180}));
+  const verify=vi.fn().mockResolvedValue({track:'Sensitive',duration:180});
+  await expect(resolveCatalogSource(catalog,vi.fn().mockResolvedValue(candidates),{verify})).rejects.toThrow();expect(verify).toHaveBeenCalledTimes(3);
+});
+it('rejects extracted credits for a different performer even when title and duration match',async()=>{
+  const candidate={...video,title:'Sensitive',channel:'Unrelated uploader',duration:180};
+  await expect(resolveCatalogSource(catalog,vi.fn().mockResolvedValue([candidate]),{verify:async()=>({track:'Sensitive',artist:'Different Artist',duration:180})})).rejects.toThrow();
+});
+it('stops chooser discovery when the selection changes during preflight',async()=>{
+  let active=true;const good={...video,duration:180,track:'Sensitive',artist:'KR$NA, Seedhe Maut'};
+  const search=vi.fn().mockResolvedValue([good,{...good,id:'lmnopqrstuv'}]);
+  const verify=vi.fn().mockImplementation(async()=>{active=false;return {};});
+  await expect(resolveCatalogSources(catalog,search,{verify,active:()=>active})).rejects.toThrow('Playback selection changed');
+  expect(verify).toHaveBeenCalledTimes(1);
+});
 
 describe("catalogue metadata and audio sources", () => {
   it('validates MusicBrainz recording identity through the existing source matcher', async () => {

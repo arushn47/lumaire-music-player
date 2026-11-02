@@ -1,0 +1,4342 @@
+{
+  "capturedAt": "2026-10-29T16:31:45.185Z",
+  "responses": [
+    {
+      "label": "saavn-search-gini",
+      "url": "https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=gini&n=20&p=1",
+      "data": {
+        "results": [
+          {
+            "id": "1616722",
+            "name": "Ginny Diwan",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "1249318",
+            "name": "Gini",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "20043211",
+            "name": "Gini",
+            "image": "https://c.saavncdn.com/artists/Gini_000_20240711101035_50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "811465",
+            "name": "Ragini",
+            "image": "https://c.saavncdn.com/artists/Ragini_20191129131407_50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "4085355",
+            "name": "Ginni Kapoor",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "783210",
+            "name": "Ginni Mahi",
+            "image": "https://c.saavncdn.com/834/Suit-Patiala-Punjabi-2017-20171116-50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "4029110",
+            "name": "Ginibini",
+            "image": "https://c.saavncdn.com/797/GINIBINIMAS-Korean-2017-20171213090017-50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "4398520",
+            "name": "Giniboi & Robin Crik",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4407134",
+            "name": "Sebastian Giniaux, Ducato Piotrowski, Pete Kubryck-Townsend",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4407135",
+            "name": "Sebastien Sebastian Giniaux, Ducato Piotrowski, Pete Kubryck-Townsend",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4407133",
+            "name": "Sebastien Giniaux, Ducato Piotrowski, Pete Kubryck-Townsend",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4407156",
+            "name": "Stochelo Rosenberg, Lollo Meier, Ritary Gaguenetti, Tcha Limberger Trio, Sebastien Giniaux, Paulus Schafer, Kussi Weiss Quint...",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4407155",
+            "name": "Stochelo Rosenberg, Ritary Gaguenetti, Tcha Limberger Trio, Sebastien Giniaux, Paulus Schafer, Kussi Weiss Quintet, Biel Ball...",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4529914",
+            "name": "Gin I Grindith",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4702538",
+            "name": "Giorgos Ginis",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4714170",
+            "name": "Gini Savage",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "7074491",
+            "name": "Onyinye Ginikanwa",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "1304914",
+            "name": "Pantelis Ginis",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "1014155",
+            "name": "DJ Tagada (Sebastian Giniaux)",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "1673551",
+            "name": "Quin Gini",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          }
+        ]
+      }
+    },
+    {
+      "label": "saavn-search-Phoenix",
+      "url": "https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=Phoenix&n=20&p=1",
+      "data": {
+        "results": [
+          {
+            "id": "10698695",
+            "name": "PHOENIX_l_",
+            "image": "https://c.saavncdn.com/artists/PHOENIX_l__000_20250115071918_50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "1281247",
+            "name": "Phoenix Chamber Choir",
+            "image": "https://c.saavncdn.com/596/Why-The-Caged-Bird-Sings-English-2017-50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "4635851",
+            "name": "Phoenix Dassan",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "3811891",
+            "name": "J Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "3924444",
+            "name": "Dice Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "3936108",
+            "name": "Radical Phoenixx",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "3940263",
+            "name": "Dana Jean Phoenix, Tape Loader",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "3962323",
+            "name": "Phoenix Jazz",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "3965709",
+            "name": "Phoenix Calling",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4023896",
+            "name": "Scarlet Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4027850",
+            "name": "Willie Phoenix & the Soul Underground",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4028029",
+            "name": "River Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4042546",
+            "name": "LOC MIKE & PHOENIX",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4045482",
+            "name": "Eben Brooks, Enrique Acosta, Phoenix Valencia",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4046145",
+            "name": "Michael Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4048291",
+            "name": "Tay Phoenixx",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4061350",
+            "name": "Buki & Xenon Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4240899",
+            "name": "Sinister Close & Yung Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4250874",
+            "name": "Alkali Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4255011",
+            "name": "Samuel Phoenix",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          }
+        ]
+      }
+    },
+    {
+      "label": "saavn-search-Aurora",
+      "url": "https://www.jiosaavn.com/api.php?__call=search.getArtistResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=Aurora&n=20&p=1",
+      "data": {
+        "results": [
+          {
+            "id": "580280",
+            "name": "Aurora",
+            "image": "https://c.saavncdn.com/artists/Aurora_000_20250409071704_50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "837246",
+            "name": "Aurora Aksnes",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "464926",
+            "name": "Rajat Arora",
+            "image": "https://c.saavncdn.com/542/Clock-Punjabi-2019-20200228111006-50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "502698",
+            "name": "Maanya Arora",
+            "image": "https://c.saavncdn.com/artists/Maanya_Arora_002_20201013101201_50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "6529212",
+            "name": "Pulkit Arora",
+            "image": "https://c.saavncdn.com/artists/Pulkit_Arora_20200218114754_50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "18290053",
+            "name": "Reed Wonder, Aurora Olivas",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "12766204",
+            "name": "aurora hills",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "8135455",
+            "name": "Harry Arora",
+            "image": "https://c.saavncdn.com/artists/Harry_Arora_000_20240626111908_50x50.jpg",
+            "type": "artist"
+          },
+          {
+            "id": "17598801",
+            "name": "13Aurora",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "3951328",
+            "name": "Aurora Elena Lacayo",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "3957149",
+            "name": "Rosa Aurora",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4031815",
+            "name": "ESTRELLA DE LA AURORA MORENTE CARBONELL; ENRIQUE MORENTE COTELO",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4033328",
+            "name": "Aurora Meddle",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-film.png",
+            "type": "artist"
+          },
+          {
+            "id": "4054568",
+            "name": "Aurora String Quarte",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4061857",
+            "name": "Officine Aurora",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4264471",
+            "name": "traditional, arranged by Edna Aurora Cabilatazan Culig",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4265608",
+            "name": "Aurora Lisette De la Plaza",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4269057",
+            "name": "Ozzie Melendez/ Aurora Weston",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4404516",
+            "name": "Aurora Yunita",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          },
+          {
+            "id": "4427196",
+            "name": "Desy Aurora",
+            "image": "https://www.jiosaavn.com/_i/3.0/artist-default-music.png",
+            "type": "artist"
+          }
+        ]
+      }
+    },
+    {
+      "label": "saavn-artist-1249318",
+      "url": "https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&_marker=0&api_version=4&ctx=web6dot0&artistId=1249318",
+      "data": {
+        "artistId": "1249318",
+        "name": "Gini",
+        "image": "https://static.saavncdn.com/_i/share-image-2.png",
+        "topSongs": {
+          "songs": [
+            {
+              "id": "1QZ2Gd99",
+              "type": "song",
+              "title": "Don't Even Text",
+              "image": "https://c.saavncdn.com/223/Don-t-Even-Text-English-2025-20250826053103-150x150.jpg",
+              "more_info": {
+                "duration": "179",
+                "album": "Don't Even Text",
+                "album_id": "67535257",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "5685742",
+                      "name": "Tsumyoki"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "hUDdgdLt",
+              "type": "song",
+              "title": "Aashiqana",
+              "image": "https://c.saavncdn.com/455/Parvana-Hindi-2026-20260225220435-150x150.jpg",
+              "more_info": {
+                "duration": "403",
+                "album": "Parvana",
+                "album_id": "72791620",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "11892514",
+                      "name": "Chaar Diwaari"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    },
+                    {
+                      "id": "464890",
+                      "name": "Indian Ocean"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "2mhmHmAc",
+              "type": "song",
+              "title": "Har Subah",
+              "image": "https://c.saavncdn.com/639/Har-Subah-Hindi-2025-20250430053838-150x150.jpg",
+              "more_info": {
+                "duration": "219",
+                "album": "Har Subah",
+                "album_id": "64188615",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "7785807",
+                      "name": "citimall"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "dqNj25_6",
+              "type": "song",
+              "title": "Jaadui Subah",
+              "image": "https://c.saavncdn.com/435/I-Nobody-Malayalam-2026-20260710115448-150x150.jpg",
+              "more_info": {
+                "duration": "207",
+                "album": "I, Nobody",
+                "album_id": "77695020",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "546740",
+                      "name": "Jakes Bejoy"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    },
+                    {
+                      "id": "1237568",
+                      "name": "Siddhant Kaushal"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "Ja3kVwd6",
+              "type": "song",
+              "title": "Way Up",
+              "image": "https://c.saavncdn.com/138/Error-Im-Brain-German-2019-20190212083030-150x150.jpg",
+              "more_info": {
+                "duration": "132",
+                "album": "Error Im Brain",
+                "album_id": "15099529",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "jrbqw53-",
+              "type": "song",
+              "title": "WAS ICH WOLLTE ❤️‍",
+              "image": "https://c.saavncdn.com/703/WAS-ICH-WOLLTE-German-2024-20231219172342-150x150.jpg",
+              "more_info": {
+                "duration": "145",
+                "album": "WAS ICH WOLLTE ❤️‍",
+                "album_id": "50569552",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "1003328",
+                      "name": "Ström"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "KatgTElu",
+              "type": "song",
+              "title": "Pariyaat",
+              "image": "https://c.saavncdn.com/466/Pariyaat-Instrumental-2025-20250326153519-150x150.jpg",
+              "more_info": {
+                "duration": "259",
+                "album": "Pariyaat",
+                "album_id": "63238733",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "21658173",
+                      "name": "Rajappa"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    },
+                    {
+                      "id": "460859",
+                      "name": "Mani"
+                    },
+                    {
+                      "id": "458690",
+                      "name": "Raju"
+                    },
+                    {
+                      "id": "456717",
+                      "name": "Manju"
+                    },
+                    {
+                      "id": "479287",
+                      "name": "Thilaka"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "25v1i8Bt",
+              "type": "song",
+              "title": "MONA LISA",
+              "image": "https://c.saavncdn.com/902/MAQSAD-Hindi-2026-20260417123120-150x150.jpg",
+              "more_info": {
+                "duration": "218",
+                "album": "MAQSAD",
+                "album_id": "74350110",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "17887634",
+                      "name": "Ezra Montoyo"
+                    },
+                    {
+                      "id": "1418169",
+                      "name": "Faizal"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    },
+                    {
+                      "id": "2715547",
+                      "name": "Faizan"
+                    }
+                  ],
+                  "featured_artists": [
+                    {
+                      "id": "6007537",
+                      "name": "Katoptris"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "UMSiD8P7",
+              "type": "song",
+              "title": "Blinded (Invaders Of Nine Remix)",
+              "image": "https://c.saavncdn.com/329/Blinded-Unknown-2023-20230210135820-150x150.jpg",
+              "more_info": {
+                "duration": "231",
+                "album": "Blinded",
+                "album_id": "42497580",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "9236687",
+                      "name": "Miami Boys"
+                    },
+                    {
+                      "id": "8889204",
+                      "name": "Glared"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": [
+                    {
+                      "id": "6007537",
+                      "name": "Katoptris"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "xZ3BlXAV",
+              "type": "song",
+              "title": "Blinded (Festival Mix)",
+              "image": "https://c.saavncdn.com/329/Blinded-Unknown-2023-20230210135820-150x150.jpg",
+              "more_info": {
+                "duration": "202",
+                "album": "Blinded",
+                "album_id": "42497580",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "9236687",
+                      "name": "Miami Boys"
+                    },
+                    {
+                      "id": "8889204",
+                      "name": "Glared"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": [
+                    {
+                      "id": "6007537",
+                      "name": "Katoptris"
+                    }
+                  ]
+                }
+              }
+            }
+          ]
+        },
+        "topAlbums": {
+          "albums": [
+            {
+              "id": "72791620",
+              "title": "Parvana",
+              "image": "https://c.saavncdn.com/455/Parvana-Hindi-2026-20260225220435-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "11892514",
+                      "name": "Chaar Diwaari"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "6"
+              },
+              "year": "2026"
+            },
+            {
+              "id": "74350110",
+              "title": "MAQSAD",
+              "image": "https://c.saavncdn.com/902/MAQSAD-Hindi-2026-20260417123120-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "1418169",
+                      "name": "Faizal"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "15"
+              },
+              "year": "2026"
+            },
+            {
+              "id": "16262920",
+              "title": "I Confess (feat. Gini &amp; The Lime)",
+              "image": "https://c.saavncdn.com/245/I-Confess-feat-Gini-The-Lime--Korean-2018-20190607042020-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "1127263",
+                      "name": "Appetizer"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "2"
+              },
+              "year": "2018"
+            },
+            {
+              "id": "16261507",
+              "title": "Everything Is Great",
+              "image": "https://c.saavncdn.com/269/Everything-Is-Great-Korean-2019-20190607041524-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "1127263",
+                      "name": "Appetizer"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "10"
+              },
+              "year": "2019"
+            },
+            {
+              "id": "63589371",
+              "title": "You Don't Know Anything",
+              "image": "https://c.saavncdn.com/205/You-Don-t-Know-Anything-Korean-2019-20250408183745-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "2"
+              },
+              "year": "2019"
+            },
+            {
+              "id": "15099529",
+              "title": "Error Im Brain",
+              "image": "https://c.saavncdn.com/138/Error-Im-Brain-German-2019-20190212083030-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "6"
+              },
+              "year": "2019"
+            },
+            {
+              "id": "17482226",
+              "title": "La Pelicula",
+              "image": "https://c.saavncdn.com/753/La-Pelicula-Spanish-2019-20191002140218-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "2151084",
+                      "name": "Various Artist"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "18"
+              },
+              "year": "2019"
+            },
+            {
+              "id": "58311399",
+              "title": "Starke Männer hören traurige Musik",
+              "image": "https://c.saavncdn.com/432/Starke-M-nner-h-ren-traurige-Musik-German-2024-20240924162126-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "982313",
+                      "name": "Bazu"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "12"
+              },
+              "year": "2024"
+            },
+            {
+              "id": "42497580",
+              "title": "Blinded",
+              "image": "https://c.saavncdn.com/329/Blinded-Unknown-2023-20230210135820-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "9236687",
+                      "name": "Miami Boys"
+                    },
+                    {
+                      "id": "8889204",
+                      "name": "Glared"
+                    },
+                    {
+                      "id": "1249318",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "3"
+              },
+              "year": "2023"
+            },
+            {
+              "id": "24418277",
+              "title": "DJ Blaster Contra Todos",
+              "image": "https://c.saavncdn.com/294/DJ-Blaster-Contra-Todos-Spanish-2005-20210101175419-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "2151084",
+                      "name": "Various Artist"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "22"
+              },
+              "year": "2005"
+            },
+            {
+              "id": "20047110",
+              "title": "ESO.ES Instrumentals",
+              "image": "https://c.saavncdn.com/092/ESO-ES-Instrumentals-German-2020-20200423131212-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "4915195",
+                      "name": "ESO.ES"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "13"
+              },
+              "year": "2020"
+            },
+            {
+              "id": "1502528",
+              "title": "El Clan del Recuerdo, Vol. 2",
+              "image": "https://c.saavncdn.com/964/El-Clan-del-Recuerdo-Vol-2-Spanish-2015-150x150.jpg",
+              "more_info": {
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "455494",
+                      "name": "Various Artists"
+                    }
+                  ],
+                  "featured_artists": []
+                },
+                "song_count": "20"
+              },
+              "year": "2015"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "label": "saavn-artist-20043211",
+      "url": "https://www.jiosaavn.com/api.php?__call=artist.getArtistPageDetails&_format=json&_marker=0&api_version=4&ctx=web6dot0&artistId=20043211",
+      "data": {
+        "artistId": "20043211",
+        "name": "Gini",
+        "image": "https://c.saavncdn.com/artists/Gini_000_20240711101035_150x150.jpg",
+        "topSongs": {
+          "songs": [
+            {
+              "id": "qeGdlBEx",
+              "type": "song",
+              "title": "Sukoon",
+              "image": "https://c.saavncdn.com/905/Sukoon-Hindi-2024-20240627142856-150x150.jpg",
+              "more_info": {
+                "duration": "186",
+                "album": "Sukoon",
+                "album_id": "55647439",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "k9P_aC3t",
+              "type": "song",
+              "title": "Feeka",
+              "image": "https://c.saavncdn.com/175/Feeka-Hindi-2026-20260204150137-150x150.jpg",
+              "more_info": {
+                "duration": "163",
+                "album": "Feeka",
+                "album_id": "72161272",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    },
+                    {
+                      "id": "7203678",
+                      "name": "NEVERSOBER"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "Dn_GzXcJ",
+              "type": "song",
+              "title": "Ab Na Laut Paayenge",
+              "image": "https://c.saavncdn.com/650/Talkhiyaan-Hindi-2026-20260510085328-150x150.jpg",
+              "more_info": {
+                "duration": "182",
+                "album": "Talkhiyaan",
+                "album_id": "75508042",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "14929656",
+                      "name": "Janisht Joshi"
+                    },
+                    {
+                      "id": "602643",
+                      "name": "Sudan"
+                    },
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "O1h_pG2O",
+              "type": "song",
+              "title": "Aashiyan",
+              "image": "https://c.saavncdn.com/414/Aashiyan-Hindi-2025-20250306172643-150x150.jpg",
+              "more_info": {
+                "duration": "174",
+                "album": "Aashiyan",
+                "album_id": "62602266",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "ClJujs4b",
+              "type": "song",
+              "title": "Chaukhat (Acoustic)",
+              "image": "https://c.saavncdn.com/139/Chaukhat-Hindi-2024-20240604131324-150x150.jpg",
+              "more_info": {
+                "duration": "233",
+                "album": "Chaukhat (Acoustic)",
+                "album_id": "54931638",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "STyZiry8",
+              "type": "song",
+              "title": "Naadaani",
+              "image": "https://c.saavncdn.com/934/Naadaani-Hindi-2025-20250730175546-150x150.jpg",
+              "more_info": {
+                "duration": "245",
+                "album": "Naadaani",
+                "album_id": "66777440",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    },
+                    {
+                      "id": "455237",
+                      "name": "Bharath"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "EqqrzhPI",
+              "type": "song",
+              "title": "Ansuna",
+              "image": "https://c.saavncdn.com/665/Ansuna-Hindi-2024-20240308081426-150x150.jpg",
+              "more_info": {
+                "duration": "224",
+                "album": "Ansuna",
+                "album_id": "52444258",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "e92rIu9-",
+              "type": "song",
+              "title": "Aasaan",
+              "image": "https://c.saavncdn.com/210/Aasaan-Hindi-2024-20240821145902-150x150.jpg",
+              "more_info": {
+                "duration": "188",
+                "album": "Aasaan",
+                "album_id": "57338372",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            },
+            {
+              "id": "kqSaJJhi",
+              "type": "song",
+              "title": "So Far Away",
+              "image": "https://c.saavncdn.com/243/So-Far-Away-English-2022-20221014180121-150x150.jpg",
+              "more_info": {
+                "duration": "151",
+                "album": "So Far Away",
+                "album_id": "39093218",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    }
+                  ],
+                  "featured_artists": [
+                    {
+                      "id": "4174109",
+                      "name": "Romy Dya"
+                    },
+                    {
+                      "id": "4174110",
+                      "name": "Jamie Scott &amp; Romy Dya"
+                    },
+                    {
+                      "id": "572762",
+                      "name": "Jamie Scott"
+                    }
+                  ]
+                }
+              }
+            },
+            {
+              "id": "N_KiWBHM",
+              "type": "song",
+              "title": "Jugnoo",
+              "image": "https://c.saavncdn.com/190/Jugnoo-English-2022-20221017210018-150x150.jpg",
+              "more_info": {
+                "duration": "180",
+                "album": "Jugnoo",
+                "album_id": "39164834",
+                "artistMap": {
+                  "primary_artists": [
+                    {
+                      "id": "20043211",
+                      "name": "Gini"
+                    },
+                    {
+                      "id": "8161916",
+                      "name": "Tansen."
+                    }
+                  ],
+                  "featured_artists": []
+                }
+              }
+            }
+          ]
+        },
+        "topAlbums": {
+          "albums": []
+        }
+      }
+    },
+    {
+      "label": "saavn-songs-gini",
+      "url": "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=gini&n=30&p=1",
+      "data": {
+        "results": [
+          {
+            "id": "x5yDo6Y5",
+            "type": "song",
+            "title": "Muddina Gini",
+            "image": "https://c.saavncdn.com/241/Yudha-Kaanda-Kannada-1988-20251014160754-150x150.jpg",
+            "more_info": {
+              "duration": "283",
+              "album": "Yudha Kaanda",
+              "album_id": "69178648",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "741999",
+                    "name": "S.P. Balasubrahmanyam"
+                  },
+                  {
+                    "id": "455844",
+                    "name": "S. Janaki"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "OiRkMK5b",
+            "type": "song",
+            "title": "Neene Sakidha Gini (From &quot;Manasa Sarovara&quot;)",
+            "image": "https://c.saavncdn.com/324/Most-Popular-Songs-Of-Srinath-Kannada-2025-20251223163024-150x150.jpg",
+            "more_info": {
+              "duration": "269",
+              "album": "Most Popular Songs Of Srinath",
+              "album_id": "70965406",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "741999",
+                    "name": "S P Balasubrahmanyam"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "QInoBt2c",
+            "type": "song",
+            "title": "Neene Sakidha Gini (From &quot;Manasa Sarovara&quot;)",
+            "image": "https://c.saavncdn.com/007/Vijaya-Bhaskar-Musical-Hits-Vol-2-Kannada-2026-20260401104352-150x150.jpg",
+            "more_info": {
+              "duration": "269",
+              "album": "Vijaya Bhaskar Musical Hits Vol-2",
+              "album_id": "74088599",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "741999",
+                    "name": "S P Balasubrahmanyam"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "K8-GdAux",
+            "type": "song",
+            "title": "NEENE SAKIDHA GINI",
+            "image": "https://c.saavncdn.com/646/MANASA-SAROVARA-Kannada-1982-20220827082450-150x150.jpg",
+            "more_info": {
+              "duration": "269",
+              "album": "MANASA SAROVARA",
+              "album_id": "37686733",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "741999",
+                    "name": "S. P. Balasubrahmanyam"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "_0PmAv54",
+            "type": "song",
+            "title": "Ginirama Ginirama",
+            "image": "https://c.saavncdn.com/570/Gandugali-Kumararama-Kannada-2006-150x150.jpg",
+            "more_info": {
+              "duration": "225",
+              "album": "Gandugali Kumararama",
+              "album_id": "2660874",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "539876",
+                    "name": "Gurukiran"
+                  },
+                  {
+                    "id": "839141",
+                    "name": "Komala Pothraj"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "Whr8ScK8",
+            "type": "song",
+            "title": "Ginirama Ginirama (from &quot;Gandugali Kumararama&quot;)",
+            "image": "https://c.saavncdn.com/263/Shiva-Rajkumar-Best-Songs-Kannada-2026-20260728223217-150x150.jpg",
+            "more_info": {
+              "duration": "224",
+              "album": "Shiva Rajkumar Best Songs",
+              "album_id": "78599071",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "539876",
+                    "name": "Gurukiran"
+                  },
+                  {
+                    "id": "839141",
+                    "name": "Komala Pothraj"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "BmFYNRkc",
+            "type": "song",
+            "title": "Giniye Nanna",
+            "image": "https://c.saavncdn.com/488/Olavu-Gelavu-Kannada-1977-20201008164048-150x150.jpg",
+            "more_info": {
+              "duration": "195",
+              "album": "Olavu Gelavu",
+              "album_id": "22958100",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "492867",
+                    "name": "Dr. Rajkumar"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "mrxeMz4m",
+            "type": "song",
+            "title": "Giniye",
+            "image": "https://c.saavncdn.com/689/50-Top-Kannada-Nursery-Rhymes-Kannada-2015-150x150.jpg",
+            "more_info": {
+              "duration": "43",
+              "album": "50 Top Kannada Nursery Rhymes",
+              "album_id": "10830606",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2596942",
+                    "name": "WowKidz"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "3qkBS9n0",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/911/Once-Unknown-2019-20210415231129-150x150.jpg",
+            "more_info": {
+              "duration": "409",
+              "album": "Once",
+              "album_id": "26589881",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "5408792",
+                    "name": "Larmour"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "10831323",
+                    "name": "Rikidy Swizz"
+                  },
+                  {
+                    "id": "1452064",
+                    "name": "Kevin K"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "Kq9-oc-g",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/325/letting-the-light-in-Unknown-2024-20240719210824-150x150.jpg",
+            "more_info": {
+              "duration": "221",
+              "album": "Letting the Light In",
+              "album_id": "56345754",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "3420603",
+                    "name": "Siwan Rhys"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "10831323",
+                    "name": "Rikidy Swizz"
+                  },
+                  {
+                    "id": "1452064",
+                    "name": "Kevin K"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "e7lOgUn_",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/305/Candies-English-2005-150x150.jpg",
+            "more_info": {
+              "duration": "221",
+              "album": "Candies",
+              "album_id": "2881295",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1356641",
+                    "name": "Mix Mup"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "10831323",
+                    "name": "Rikidy Swizz"
+                  },
+                  {
+                    "id": "1452064",
+                    "name": "Kevin K"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "Xf4W4Mw4",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/085/Hayastan-English-2019-20191222190114-150x150.jpg",
+            "more_info": {
+              "duration": "133",
+              "album": "Hayastan",
+              "album_id": "18408732",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1166465",
+                    "name": "Ruben Matevosyan"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "10831323",
+                    "name": "Rikidy Swizz"
+                  },
+                  {
+                    "id": "1452064",
+                    "name": "Kevin K"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "pZac0LKT",
+            "type": "song",
+            "title": "Gini (Original Mix)",
+            "image": "https://c.saavncdn.com/672/Outline-EP-Unknown-2019-20230126162222-150x150.jpg",
+            "more_info": {
+              "duration": "183",
+              "album": "Outline EP",
+              "album_id": "42038769",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1025230",
+                    "name": "Moelamonde"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "10831323",
+                    "name": "Rikidy Swizz"
+                  },
+                  {
+                    "id": "1452064",
+                    "name": "Kevin K"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "8he5E0T-",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/219/After-The-Rain-English-2026-20260922203237-150x150.jpg",
+            "more_info": {
+              "duration": "149",
+              "album": "After The Rain",
+              "album_id": "80953352",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "9140169",
+                    "name": "DAMEFOE"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "10831323",
+                    "name": "Rikidy Swizz"
+                  },
+                  {
+                    "id": "1452064",
+                    "name": "Kevin K"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "rl7RctBA",
+            "type": "song",
+            "title": "Gini (feat. Terry tha Rapman)",
+            "image": "https://c.saavncdn.com/173/Life-of-Yannick-Philippe-Mixtape-Vol-1--English-2018-20180221153114-150x150.jpg",
+            "more_info": {
+              "duration": "208",
+              "album": "Life of Yannick Philippe (Mixtape, Vol. 1)",
+              "album_id": "12292123",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "3270813",
+                    "name": "Yannick Philippe"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "1502565",
+                    "name": "Terry Tha Rapman"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "p0fA3hEZ",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/902/Gini-German-2021-20220918104640-150x150.jpg",
+            "more_info": {
+              "duration": "245",
+              "album": "Gini",
+              "album_id": "38317764",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1728096",
+                    "name": "VAN HOLZEN"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "1502565",
+                    "name": "Terry Tha Rapman"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "h-wTEqcd",
+            "type": "song",
+            "title": "GINI (Prod. by EXEDERATION)",
+            "image": "https://c.saavncdn.com/636/USER-OD-Russian-2020-20220717140712-150x150.jpg",
+            "more_info": {
+              "duration": "110",
+              "album": "USER OD",
+              "album_id": "36574262",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1347842",
+                    "name": "Batô"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "5946408",
+                    "name": "Murasaki"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "5Rr_sfXi",
+            "type": "song",
+            "title": "Gini (fast version)",
+            "image": "https://c.saavncdn.com/361/Gini-fast-version-English-2025-20251112054752-150x150.jpg",
+            "more_info": {
+              "duration": "122",
+              "album": "Gini (fast version)",
+              "album_id": "69689104",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "16983724",
+                    "name": "Supajosh"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "5946408",
+                    "name": "Murasaki"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "SjHWRmF0",
+            "type": "song",
+            "title": "gini",
+            "image": "https://c.saavncdn.com/237/gini-English-2020-20200210194052-150x150.jpg",
+            "more_info": {
+              "duration": "101",
+              "album": "gini",
+              "album_id": "19009056",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "7307036",
+                    "name": "keko.the.dog"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "5946408",
+                    "name": "Murasaki"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "O9JWz4eV",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/087/Volume-One-English-2018-20180613123322-150x150.jpg",
+            "more_info": {
+              "duration": "182",
+              "album": "Volume One",
+              "album_id": "13138184",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "5002297",
+                    "name": "Neal Pace and the Triumphantly Ragged"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "5946408",
+                    "name": "Murasaki"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "pqxkSP7J",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/843/NIGHT-PROLOGUE-French-2026-20260211223421-150x150.jpg",
+            "more_info": {
+              "duration": "430",
+              "album": "NIGHT PROLOGUE",
+              "album_id": "72413040",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1352874",
+                    "name": "Loryn"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "mG3eBvuH",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/954/Pass-It-On-English-2015-150x150.jpg",
+            "more_info": {
+              "duration": "229",
+              "album": "Pass It On",
+              "album_id": "1244947",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "804133",
+                    "name": "Douwe Bob"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "Rc8wpqpg",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/638/Gini-Igbo-2026-20260305195814-150x150.jpg",
+            "more_info": {
+              "duration": "143",
+              "album": "Gini",
+              "album_id": "73069330",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "24633765",
+                    "name": "Skiloto"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "OkXeAlF_",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/164/Letto-E-Braccio-Di-Flor-English-2019-20230420171859-150x150.jpg",
+            "more_info": {
+              "duration": "229",
+              "album": "Letto E Braccio Di Flor",
+              "album_id": "44728051",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1866639",
+                    "name": "Glauco Ceccarelli"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "pv6GA4SX",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/317/Gini-Russian-2022-20221117230040-150x150.jpg",
+            "more_info": {
+              "duration": "169",
+              "album": "Gini",
+              "album_id": "40044841",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "6554920",
+                    "name": "Nurik Smit"
+                  },
+                  {
+                    "id": "3345319",
+                    "name": "Bonah"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "g84Lf4iu",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/745/Gini-Unknown-2023-20230731080230-150x150.jpg",
+            "more_info": {
+              "duration": "462",
+              "album": "Gini",
+              "album_id": "47152395",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "3404025",
+                    "name": "Leonel Diaz"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "1502565",
+                    "name": "Terry Tha Rapman"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "8rYoNUqP",
+            "type": "song",
+            "title": "Gini (feat. Thiago Chang)",
+            "image": "https://c.saavncdn.com/688/Vida-Portuguese-2016-20190406103125-150x150.jpg",
+            "more_info": {
+              "duration": "237",
+              "album": "Vida",
+              "album_id": "15568053",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "5498942",
+                    "name": "Rockomodo"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "6245047",
+                    "name": "Thiago Chang"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "6qCzSbbD",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/956/Qaravan-Armenian-2017-150x150.jpg",
+            "more_info": {
+              "duration": "407",
+              "album": "Qaravan",
+              "album_id": "10490497",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1166437",
+                    "name": "Aida Sargsyan"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "6245047",
+                    "name": "Thiago Chang"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "UxA_24TZ",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/917/Gini-Igbo-2026-20260606005141-150x150.jpg",
+            "more_info": {
+              "duration": "360",
+              "album": "Gini",
+              "album_id": "76545081",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "24945265",
+                    "name": "Soloprosper"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "6245047",
+                    "name": "Thiago Chang"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "shEgI3mX",
+            "type": "song",
+            "title": "Gini",
+            "image": "https://c.saavncdn.com/797/Piano-Chill-English-2022-20220531210032-150x150.jpg",
+            "more_info": {
+              "duration": "273",
+              "album": "Piano Chill",
+              "album_id": "35399690",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2731936",
+                    "name": "Hjortur"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "6245047",
+                    "name": "Thiago Chang"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": "saavn-songs-chaukhat",
+      "url": "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=chaukhat&n=30&p=1",
+      "data": {
+        "results": [
+          {
+            "id": "ClJujs4b",
+            "type": "song",
+            "title": "Chaukhat (Acoustic)",
+            "image": "https://c.saavncdn.com/139/Chaukhat-Hindi-2024-20240604131324-150x150.jpg",
+            "more_info": {
+              "duration": "233",
+              "album": "Chaukhat (Acoustic)",
+              "album_id": "54931638",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "20043211",
+                    "name": "Gini"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "gnlOrYJM",
+            "type": "song",
+            "title": "Chaukhat Pe Tumhari Hum",
+            "image": "https://c.saavncdn.com/750/Aankhen-Hindi-Original-Motion-Picture-Soundtrack-Hindi-1992-20250819194103-150x150.jpg",
+            "more_info": {
+              "duration": "402",
+              "album": "Aankhen Hindi (Original Motion Picture Soundtrack)",
+              "album_id": "1017841",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "455142",
+                    "name": "Kumar Sanu"
+                  },
+                  {
+                    "id": "733192",
+                    "name": "Mohammed Aziz"
+                  },
+                  {
+                    "id": "455202",
+                    "name": "Sapna Mukherjee"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "gzavmBY2",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/661/Chaukhat-English-2026-20260527102125-150x150.jpg",
+            "more_info": {
+              "duration": "291",
+              "album": "Chaukhat",
+              "album_id": "76134548",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "3630201",
+                    "name": "Deep Sarohe"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "TM8838GT",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/182/Dosti-Se-Pyaar-Tak-Hindi-2026-20260716051645-150x150.jpg",
+            "more_info": {
+              "duration": "199",
+              "album": "Dosti Se Pyaar Tak",
+              "album_id": "78088280",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "9963055",
+                    "name": "Suman Nayak"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "3VW_6dqD",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/898/Chaukhat-Hindi-2026-20260114095011-150x150.jpg",
+            "more_info": {
+              "duration": "275",
+              "album": "Chaukhat",
+              "album_id": "71587668",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "23378974",
+                    "name": "naati bhaii"
+                  },
+                  {
+                    "id": "781801",
+                    "name": "Afsana Khan"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "zLHltmac",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/104/A-City-Of-Bangers-Unknown-2024-20241205224726-150x150.jpg",
+            "more_info": {
+              "duration": "139",
+              "album": "A City Of Bangers",
+              "album_id": "60258725",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "13701492",
+                    "name": "Shadowmind14"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "dYkQET9t",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/578/Chaukhat-Hindi-2025-20250811210108-150x150.jpg",
+            "more_info": {
+              "duration": "217",
+              "album": "Chaukhat",
+              "album_id": "67117657",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "22845097",
+                    "name": "Abhishek Bharati"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "GPXme9zO",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/615/Love-Note-for-Not-Love-Unknown-2026-20260302090524-150x150.jpg",
+            "more_info": {
+              "duration": "309",
+              "album": "Love Note for Not Love",
+              "album_id": "72951850",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2037876",
+                    "name": "The Rahi"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "xbI44QCd",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/516/Future-Rockstar-Unknown-2024-20241023065426-150x150.jpg",
+            "more_info": {
+              "duration": "139",
+              "album": "Future Rockstar",
+              "album_id": "59108602",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "13701492",
+                    "name": "Shadowmind14"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "xQdkoDaT",
+            "type": "song",
+            "title": "Chaukhat",
+            "image": "https://c.saavncdn.com/052/Chaukhat-Hindi-2026-20260526151858-150x150.jpg",
+            "more_info": {
+              "duration": "181",
+              "album": "Chaukhat",
+              "album_id": "75697764",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "5917275",
+                    "name": "Mukku"
+                  },
+                  {
+                    "id": "465684",
+                    "name": "Leela"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "EuhPiP1P",
+            "type": "song",
+            "title": "Teri Chaukhat Pe",
+            "image": "https://c.saavncdn.com/329/Jidhar-Dekho-Jagrate-2013-150x150.jpg",
+            "more_info": {
+              "duration": "368",
+              "album": "Jidhar Dekho Jagrate",
+              "album_id": "1139449",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "473171",
+                    "name": "Panna Gill"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "wKpUWOzR",
+            "type": "song",
+            "title": "Chaukhat Pe Tumhari Hum - JB",
+            "image": "https://c.saavncdn.com/327/Aankhen-With-Jhankar-Beats-1992-150x150.jpg",
+            "more_info": {
+              "duration": "409",
+              "album": "Aankhen - With Jhankar Beats",
+              "album_id": "1150319",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "455843",
+                    "name": "Bappi Lahiri"
+                  },
+                  {
+                    "id": "455142",
+                    "name": "Kumar Sanu"
+                  },
+                  {
+                    "id": "733192",
+                    "name": "Mohammad Aziz"
+                  },
+                  {
+                    "id": "455202",
+                    "name": "Sapna Mukherjee"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "LglZW1kI",
+            "type": "song",
+            "title": "Maa Ki Chaukhat Par Sir Rakh Ke",
+            "image": "https://c.saavncdn.com/118/Mata-Mata-Ki-Bhenten-1999-150x150.jpg",
+            "more_info": {
+              "duration": "399",
+              "album": "Mata (Mata Ki Bhenten)",
+              "album_id": "1038118",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "457106",
+                    "name": "Surender Kohli"
+                  },
+                  {
+                    "id": "456313",
+                    "name": "Narendra Chanchal"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "RBG3rrGR",
+            "type": "song",
+            "title": "Meri Chaukhat Pe Chalke Aaj",
+            "image": "https://c.saavncdn.com/574/Meri-Chaukhat-Pe-Chalke-Aaj-Hindi-2025-20251222122659-150x150.jpg",
+            "more_info": {
+              "duration": "264",
+              "album": "Meri Chaukhat Pe Chalke Aaj",
+              "album_id": "70920695",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "474292",
+                    "name": "Manoj Singh"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "l7jr009y",
+            "type": "song",
+            "title": "Teri Chaukhat",
+            "image": "https://c.saavncdn.com/576/Hari-Bol-Hindi-2005-20221126061430-150x150.jpg",
+            "more_info": {
+              "duration": "1769",
+              "album": "Hari Bol",
+              "album_id": "40279453",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "14640150",
+                    "name": "Baldev Krishan"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "DQmMTSMO",
+            "type": "song",
+            "title": "Dhooni Radhe Radhe Govind......Tere Chaukhat Pe",
+            "image": "https://c.saavncdn.com/876/Aao-Shayam-Ji-Vol-10-2000-150x150.jpg",
+            "more_info": {
+              "duration": "1805",
+              "album": "Aao Shayam Ji (Vol. 10)",
+              "album_id": "1017876",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "456312",
+                    "name": "Mahesh Prabhakar"
+                  },
+                  {
+                    "id": "457748",
+                    "name": "Vinod Agarwal"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "8bWyGZhC",
+            "type": "song",
+            "title": "Ilahi Teri Chaukhat Vocals Only",
+            "image": "https://c.saavncdn.com/049/Ilahi-Teri-Chaukhat-Vocals-Only-Hindi-2019-20220718010246-150x150.jpg",
+            "more_info": {
+              "duration": "305",
+              "album": "Ilahi Teri Chaukhat Vocals Only",
+              "album_id": "36561729",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "8787068",
+                    "name": "AQIB FARID"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "T_afKUvo",
+            "type": "song",
+            "title": "Dhooni Radhe Radhe Govind......Tere Chaukhat Pe He Shyam Pyare",
+            "image": "https://c.saavncdn.com/461/Aao-Shyam-Ji-Hindi-2001-20221117231228-150x150.jpg",
+            "more_info": {
+              "duration": "1805",
+              "album": "Aao Shyam Ji",
+              "album_id": "40051050",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "457748",
+                    "name": "Vinod Agarwal"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "4-kVONB9",
+            "type": "song",
+            "title": "Teri Chaukhat Pe Aana Mera Kaam Hai",
+            "image": "https://c.saavncdn.com/760/Teri-Chaukhat-Pe-Aana-Mera-Kaam-Hai-Hindi-2023-20230123131514-150x150.jpg",
+            "more_info": {
+              "duration": "304",
+              "album": "Teri Chaukhat Pe Aana Mera Kaam Hai",
+              "album_id": "41914652",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "8377126",
+                    "name": "Upasana Mehta"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "GFLGrHaQ",
+            "type": "song",
+            "title": "Chaukhat Pe Tumhari Hum (From &quot;Aankhen&quot;)",
+            "image": "https://c.saavncdn.com/425/Venus-Compilation-Songs-Rajasthani-2016-20240229070225-150x150.jpg",
+            "more_info": {
+              "duration": "402",
+              "album": "Venus Compilation Songs",
+              "album_id": "52245504",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "455142",
+                    "name": "Kumar Sanu"
+                  },
+                  {
+                    "id": "733192",
+                    "name": "Mohammed Aziz"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "YMAZ4x-9",
+            "type": "song",
+            "title": "Chaukhat Pe Tumhari Hum",
+            "image": "https://c.saavncdn.com/115/Best-Collection-Of-Govinda-2013-150x150.jpg",
+            "more_info": {
+              "duration": "412",
+              "album": "Best Collection Of Govinda",
+              "album_id": "1146440",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "455843",
+                    "name": "Bappi Lahiri"
+                  },
+                  {
+                    "id": "455142",
+                    "name": "Kumar Sanu"
+                  },
+                  {
+                    "id": "733192",
+                    "name": "Mohammad Aziz"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "kjG53OFC",
+            "type": "song",
+            "title": "Chaukhat Pe Tumhari Hum",
+            "image": "https://c.saavncdn.com/003/The-Melodious-Mohammed-Aziz-Hindi-2016-150x150.jpg",
+            "more_info": {
+              "duration": "412",
+              "album": "The Melodious Mohammed Aziz",
+              "album_id": "2413109",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "733192",
+                    "name": "Mohammed Aziz"
+                  },
+                  {
+                    "id": "455202",
+                    "name": "Sapna Mukherjee"
+                  },
+                  {
+                    "id": "455142",
+                    "name": "Kumar Sanu"
+                  },
+                  {
+                    "id": "455843",
+                    "name": "Bappi Lahiri"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "_zytDPKm",
+            "type": "song",
+            "title": "Chaukhat Pe Tumhari Hum",
+            "image": "https://c.saavncdn.com/479/King-Of-Comedy-David-Dhawan-15-Back-To-Back-Hits-Hindi-2017-150x150.jpg",
+            "more_info": {
+              "duration": "411",
+              "album": "King Of Comedy David Dhawan - 15 Back To Back Hits",
+              "album_id": "11575277",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "455142",
+                    "name": "Kumar Sanu"
+                  },
+                  {
+                    "id": "733192",
+                    "name": "Mohd. Aziz"
+                  },
+                  {
+                    "id": "455202",
+                    "name": "Sapna Mukherjee"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "xOnzjw7G",
+            "type": "song",
+            "title": "Teri chaukhat ka fakir hun bhole",
+            "image": "https://c.saavncdn.com/858/Teri-chaukhat-ka-fakir-hun-bhole-Hindi-2026-20260927121641-150x150.jpg",
+            "more_info": {
+              "duration": "350",
+              "album": "Teri chaukhat ka fakir hun bhole",
+              "album_id": "81159307",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "14257181",
+                    "name": "Avrit"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "qXp4Q_DU",
+            "type": "song",
+            "title": "Chaukhat Pe Ladli Ki",
+            "image": "https://c.saavncdn.com/047/Chaukhat-Pe-Ladli-Ki-Hindi-2024-20240527155005-150x150.jpg",
+            "more_info": {
+              "duration": "242",
+              "album": "Chaukhat Pe Ladli Ki",
+              "album_id": "54702127",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "482834",
+                    "name": "Ravi Raj"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "-lKfgnOs",
+            "type": "song",
+            "title": "Chaukhat Pe Jabin Niyaz Hai",
+            "image": "https://c.saavncdn.com/973/Dil-Fidaye-Banda-Nawaz-Hai-Hindi-2002-20260127215252-150x150.jpg",
+            "more_info": {
+              "duration": "866",
+              "album": "Dil Fidaye Banda Nawaz Hai",
+              "album_id": "71976141",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "476485",
+                    "name": "Anwar Jani"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "DWbv_JfR",
+            "type": "song",
+            "title": "Chaukhat Pe Chiraiya",
+            "image": "https://c.saavncdn.com/062/Chaukhat-Pe-Chiraiya-Hindi-2025-20250912102007-150x150.jpg",
+            "more_info": {
+              "duration": "356",
+              "album": "Chaukhat Pe Chiraiya",
+              "album_id": "68013149",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "23412046",
+                    "name": "Parshuram Avasthi"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "MKtdj3_l",
+            "type": "song",
+            "title": "Chaukhat Mahaveer Ki",
+            "image": "https://c.saavncdn.com/039/Chaukhat-Mahaveer-Ki-Hindi-2026-20260811093804-150x150.jpg",
+            "more_info": {
+              "duration": "306",
+              "album": "Chaukhat Mahaveer Ki",
+              "album_id": "79120006",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "22661252",
+                    "name": "Dj Aarun"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "O9jtwMu_",
+            "type": "song",
+            "title": "Chaukhat Pe Bhawani",
+            "image": "https://c.saavncdn.com/146/Gun-Gan-Maiya-Ke-Bhojpuri-2013-20250922155602-150x150.jpg",
+            "more_info": {
+              "duration": "262",
+              "album": "Gun Gan Maiya Ke",
+              "album_id": "68264382",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "456218",
+                    "name": "Mohit"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "hlMJVudT",
+            "type": "song",
+            "title": "Chaukhat Se Na Jayenge",
+            "image": "https://c.saavncdn.com/070/Chaukhat-Se-Na-Jayenge-Unknown-2026-20260204100818-150x150.jpg",
+            "more_info": {
+              "duration": "232",
+              "album": "Chaukhat Se Na Jayenge",
+              "album_id": "72196855",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "11645468",
+                    "name": "Sabeel"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": "saavn-songs-Feeka",
+      "url": "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&api_version=4&ctx=web6dot0&q=Feeka&n=30&p=1",
+      "data": {
+        "results": [
+          {
+            "id": "k9P_aC3t",
+            "type": "song",
+            "title": "Feeka",
+            "image": "https://c.saavncdn.com/175/Feeka-Hindi-2026-20260204150137-150x150.jpg",
+            "more_info": {
+              "duration": "163",
+              "album": "Feeka",
+              "album_id": "72161272",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "20043211",
+                    "name": "Gini"
+                  },
+                  {
+                    "id": "7203678",
+                    "name": "NEVERSOBER"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "xZeyn68O",
+            "type": "song",
+            "title": "Feeka",
+            "image": "https://c.saavncdn.com/414/Cafe-Music-Relaxation-Unknown-2022-20260703144533-150x150.jpg",
+            "more_info": {
+              "duration": "291",
+              "album": "Cafe Music - Relaxation",
+              "album_id": "77610928",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2156925",
+                    "name": "Secret Sounds"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "G9GDK9wQ",
+            "type": "song",
+            "title": "Feeka",
+            "image": "https://c.saavncdn.com/199/Feeka-Instrumental-2026-20260922122320-150x150.jpg",
+            "more_info": {
+              "duration": "171",
+              "album": "Feeka",
+              "album_id": "80948101",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "27068395",
+                    "name": "Fantom Updates"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "_PLsKydw",
+            "type": "song",
+            "title": "Fekab Nikaal Ke Dil",
+            "image": "https://c.saavncdn.com/769/Fekab-Nikaal-Ke-Dil-Bhojpuri-2026-20260626161028-150x150.jpg",
+            "more_info": {
+              "duration": "289",
+              "album": "Fekab Nikaal Ke Dil",
+              "album_id": "76975914",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2919028",
+                    "name": "Abhishek Tiwari"
+                  },
+                  {
+                    "id": "8015582",
+                    "name": "Shashi Bhushan Parth"
+                  },
+                  {
+                    "id": "773256",
+                    "name": "Samar Singh"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "d7F3H9kr",
+            "type": "song",
+            "title": "Feeka Feeka",
+            "image": "https://c.saavncdn.com/501/Feeka-Feeka-Bhojpuri-2022-20220927111334-150x150.jpg",
+            "more_info": {
+              "duration": "204",
+              "album": "Feeka Feeka",
+              "album_id": "38581330",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2409737",
+                    "name": "Shilpi Raj"
+                  },
+                  {
+                    "id": "3324563",
+                    "name": "Shhubham Sinha"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "qw-ySwaM",
+            "type": "song",
+            "title": "Choli Se Fekata Bhap",
+            "image": "https://c.saavncdn.com/089/Ohi-Re-Jaghaiya-Dante-Kat-Lele-Rajaji-Bhojpuri-2012-20220914193413-150x150.jpg",
+            "more_info": {
+              "duration": "274",
+              "album": "Ohi Re Jaghaiya Dante Kat Lele Rajaji",
+              "album_id": "38206854",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "456857",
+                    "name": "Pawan Singh"
+                  },
+                  {
+                    "id": "456126",
+                    "name": "Kalpana"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "xav8EqjJ",
+            "type": "song",
+            "title": "Choli Se Fekata Bhap",
+            "image": "https://c.saavncdn.com/850/Choliya-Saket-Hota-Raja-Ji-Bhojpuri-2008-20240729124533-150x150.jpg",
+            "more_info": {
+              "duration": "273",
+              "album": "Choliya Saket Hota Raja Ji",
+              "album_id": "56619682",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "456126",
+                    "name": "Kalpana"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "dXtUPIu7",
+            "type": "song",
+            "title": "Tarbujja Bujabujja Fekata",
+            "image": "https://c.saavncdn.com/537/Tarbujja-Bujabujja-Fekata-Bhojpuri-2026-20260513191430-150x150.jpg",
+            "more_info": {
+              "duration": "186",
+              "album": "Tarbujja Bujabujja Fekata",
+              "album_id": "75648488",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "773256",
+                    "name": "Samar Singh"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "WuqW0SDJ",
+            "type": "song",
+            "title": "Feeka Lage Holi Tyohar Ho",
+            "image": "https://c.saavncdn.com/561/Feeka-Lage-Holi-Tyohar-Ho-Bhojpuri-2026-20260114203859-150x150.jpg",
+            "more_info": {
+              "duration": "337",
+              "album": "Feeka Lage Holi Tyohar Ho",
+              "album_id": "71608392",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "761030",
+                    "name": "Jyoti Singh"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "rS0n72J2",
+            "type": "song",
+            "title": "Feeka Safar",
+            "image": "https://c.saavncdn.com/167/Feeka-Safar-Hindi-2023-20230730224003-150x150.jpg",
+            "more_info": {
+              "duration": "141",
+              "album": "Feeka Safar",
+              "album_id": "47133955",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "8468395",
+                    "name": "G dot J"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "7633266",
+                    "name": "Manny Music"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "at5RzvmA",
+            "type": "song",
+            "title": "Feeka Feeka",
+            "image": "https://c.saavncdn.com/212/Feeka-Feeka-Unknown-2022-20220913085742-150x150.jpg",
+            "more_info": {
+              "duration": "161",
+              "album": "Feeka Feeka",
+              "album_id": "38170110",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "9739458",
+                    "name": "AkRaz"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "oJQ3M6yc",
+            "type": "song",
+            "title": "Feeka Feeka 2.0",
+            "image": "https://c.saavncdn.com/995/Feeka-Feeka-2-0-Bhojpuri-2022-20221204230506-150x150.jpg",
+            "more_info": {
+              "duration": "205",
+              "album": "Feeka Feeka 2.0",
+              "album_id": "40516487",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2409737",
+                    "name": "Shilpi Raj"
+                  },
+                  {
+                    "id": "7421989",
+                    "name": "Krrishna Sharma"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "3v47TrVC",
+            "type": "song",
+            "title": "Feeka Par Gail Mehdi Kalai Ke",
+            "image": "https://c.saavncdn.com/373/Feeka-Par-Gail-Mehdi-Kalai-Ke-Unknown-2025-20251111135643-150x150.jpg",
+            "more_info": {
+              "duration": "270",
+              "album": "Feeka Par Gail Mehdi Kalai Ke",
+              "album_id": "69667707",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "7768476",
+                    "name": "Radhika Rana"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "k6g1MkaQ",
+            "type": "song",
+            "title": "Feeka Maal",
+            "image": "https://c.saavncdn.com/240/Feeka-Maal-Hindi-2025-20260507154633-150x150.jpg",
+            "more_info": {
+              "duration": "175",
+              "album": "Feeka Maal",
+              "album_id": "66501524",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "25610660",
+                    "name": "IT'S NMO"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "DW6h9TrG",
+            "type": "song",
+            "title": "Feekar",
+            "image": "https://c.saavncdn.com/791/Fractalize-English-2018-20180508060131-150x150.jpg",
+            "more_info": {
+              "duration": "70",
+              "album": "Fractalize",
+              "album_id": "12917832",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "4825288",
+                    "name": "DropBoss"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "FAFB-Fb0",
+            "type": "song",
+            "title": "Feeka Lage Rangwa",
+            "image": "https://c.saavncdn.com/966/Feeka-Lage-Rangwa-Bhojpuri-2026-20260304225113-150x150.jpg",
+            "more_info": {
+              "duration": "251",
+              "album": "Feeka Lage Rangwa",
+              "album_id": "73033047",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "20304804",
+                    "name": "Pappu Pardeshi Giri"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "gIJaSfZK",
+            "type": "song",
+            "title": "Bikhe Ban Feeka",
+            "image": "https://c.saavncdn.com/899/Bikhe-Ban-Feeka-Punjabi-2022-20260316203404-150x150.jpg",
+            "more_info": {
+              "duration": "413",
+              "album": "Bikhe Ban Feeka",
+              "album_id": "73455880",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "6095797",
+                    "name": "Bhai Gurkirat Singh Ji Hazoori Ragi Sri Darbar Sahib Amritsar"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "VBEH-h2R",
+            "type": "song",
+            "title": "Chand Bhi Feeka",
+            "image": "https://c.saavncdn.com/229/Backpack-Studio-Season-3-Hindi-2021-20210824135258-150x150.jpg",
+            "more_info": {
+              "duration": "313",
+              "album": "Backpack Studio: Season 3",
+              "album_id": "29224951",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "11291767",
+                    "name": "Raj Himachali"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "1OFpceHr",
+            "type": "song",
+            "title": "Ya Rabbo Feeka",
+            "image": "https://c.saavncdn.com/375/Le-Asmak-Orannem-Arabic-2016-150x150.jpg",
+            "more_info": {
+              "duration": "312",
+              "album": "Le Asmak Orannem",
+              "album_id": "1898851",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "1280822",
+                    "name": "Trinity Team"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "SVqgrkq6",
+            "type": "song",
+            "title": "Pandi Ji Pa Fekali",
+            "image": "https://c.saavncdn.com/639/Pandi-Ji-Pa-Fekali-Bhojpuri-2022-20220712130920-150x150.jpg",
+            "more_info": {
+              "duration": "240",
+              "album": "Pandi Ji Pa Fekali",
+              "album_id": "36405094",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "473591",
+                    "name": "Khesari Lal Yadav"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "ZgDeeQkN",
+            "type": "song",
+            "title": "Rang Feeka Pad Gaya Ni Krishna Tere Gama De Mare",
+            "image": "https://c.saavncdn.com/504/Rang-Feeka-Pad-Gaya-Ni-Krishna-Tere-Gama-De-Mare-Himachali-2026-20260824110801-150x150.jpg",
+            "more_info": {
+              "duration": "217",
+              "album": "Rang Feeka Pad Gaya Ni Krishna Tere Gama De Mare",
+              "album_id": "79604425",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "490295",
+                    "name": "Gunjan"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "FHHIXZV5",
+            "type": "song",
+            "title": "Ho Rang Feeka Pad Gaya Ni Wo Bholeya Tereya Gama De Mare",
+            "image": "https://c.saavncdn.com/134/Ho-Rang-Feeka-Pad-Gaya-Ni-Wo-Bholeya-Tereya-Gama-De-Mare-Himachali-2026-20260819123005-150x150.jpg",
+            "more_info": {
+              "duration": "250",
+              "album": "Ho Rang Feeka Pad Gaya Ni Wo Bholeya Tereya Gama De Mare",
+              "album_id": "79418272",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "490295",
+                    "name": "Gunjan"
+                  }
+                ],
+                "featured_artists": []
+              }
+            }
+          },
+          {
+            "id": "bHPXpuY7",
+            "type": "song",
+            "title": "Choli Se Fekatawe Luti",
+            "image": "https://c.saavncdn.com/947/Driver-Saiya-Bhojpuri-2010-20230412000443-150x150.jpg",
+            "more_info": {
+              "duration": "277",
+              "album": "Driver Saiya",
+              "album_id": "44426014",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "7052412",
+                    "name": "Vijeta Goswami"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "AxwYOdvB",
+            "type": "song",
+            "title": "Fekatari Bhauji Rangawa",
+            "image": "https://c.saavncdn.com/829/Aawa-Holi-Kheli-Bhojpuri-2023-20241211141127-150x150.jpg",
+            "more_info": {
+              "duration": "307",
+              "album": "Aawa Holi Kheli",
+              "album_id": "60419302",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "473591",
+                    "name": "Khesari Lal Yadav"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "dLBo2ygC",
+            "type": "song",
+            "title": "Mausi Tor Dil Fekatiya",
+            "image": "https://c.saavncdn.com/335/Mausi-Tor-Dil-Fekatiya-Unknown-2026-20260122183914-150x150.jpg",
+            "more_info": {
+              "duration": "226",
+              "album": "Mausi Tor Dil Fekatiya",
+              "album_id": "71849317",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "3167119",
+                    "name": "Tuntun Yadav"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "WMZfMFdH",
+            "type": "song",
+            "title": "Feka",
+            "image": "https://c.saavncdn.com/774/Feka-English-2019-20200107043311-150x150.jpg",
+            "more_info": {
+              "duration": "127",
+              "album": "Feka",
+              "album_id": "18547382",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "7465362",
+                    "name": "Rico Chico"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "elcqstkp",
+            "type": "song",
+            "title": "Tohra Bina Feeka Holi",
+            "image": "https://c.saavncdn.com/795/Tohra-Bina-Feeka-Holi-Bhojpuri-2025-20250305120202-150x150.jpg",
+            "more_info": {
+              "duration": "269",
+              "album": "Tohra Bina Feeka Holi",
+              "album_id": "62566156",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "19081486",
+                    "name": "Star Rajeev Raj"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "SguASmNL",
+            "type": "song",
+            "title": "Fekas",
+            "image": "https://c.saavncdn.com/160/5-N-Septo-Spanish-2025-20250318120739-150x150.jpg",
+            "more_info": {
+              "duration": "144",
+              "album": "5 N Septo",
+              "album_id": "63000810",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "7988932",
+                    "name": "Ereman"
+                  },
+                  {
+                    "id": "15514302",
+                    "name": "AleexBeat"
+                  },
+                  {
+                    "id": "15694726",
+                    "name": "Jor Pdkz"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "Rwjri_y5",
+            "type": "song",
+            "title": "Feka",
+            "image": "https://c.saavncdn.com/171/Feka-Unknown-2021-20210405112142-150x150.jpg",
+            "more_info": {
+              "duration": "108",
+              "album": "Feka",
+              "album_id": "26368526",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "2625901",
+                    "name": "Bragi"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "id": "5qN7GbJ1",
+            "type": "song",
+            "title": "Feka",
+            "image": "https://c.saavncdn.com/164/Feka-Unknown-2021-20210303042706-150x150.jpg",
+            "more_info": {
+              "duration": "160",
+              "album": "Feka",
+              "album_id": "25705882",
+              "artistMap": {
+                "primary_artists": [
+                  {
+                    "id": "9967741",
+                    "name": "El Flako Nigga"
+                  }
+                ],
+                "featured_artists": [
+                  {
+                    "id": "22909882",
+                    "name": "Prod.Jerry"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "label": "apple-artist-1629301422",
+      "url": "https://itunes.apple.com/lookup?id=1629301422&entity=song&limit=200",
+      "data": {
+        "results": [
+          {
+            "wrapperType": "artist",
+            "artistName": "gini",
+            "artistId": 1629301422
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1754358682,
+            "trackId": 1754358687,
+            "artistName": "gini",
+            "collectionName": "Sukoon - Single",
+            "trackName": "Sukoon",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/72/4e/bf/724ebfee-8bcd-6a9f-0672-c08d2d163b5e/198588522905.jpg/100x100bb.jpg",
+            "releaseDate": "2024-07-10T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 186393
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1826971093,
+            "trackId": 1826971095,
+            "artistName": "gini & Bharath",
+            "collectionName": "Naadaani - Single",
+            "trackName": "Naadaani",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/38/d8/c2/38d8c201-6bf8-9cae-dc4d-9f04c8a0f3bb/196873411934.jpg/100x100bb.jpg",
+            "releaseDate": "2025-07-31T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 244406
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1167481176,
+            "collectionId": 1787000417,
+            "trackId": 1787000689,
+            "artistName": "Aashir Wajahat & gini",
+            "collectionName": "Aadhey Adhoorey - Single",
+            "trackName": "Aadhey Adhoorey",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/82/0d/a1/820da177-09ab-a2c1-cdd3-a2812b1b6b64/196872718058.jpg/100x100bb.jpg",
+            "releaseDate": "2025-01-09T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 173125
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1797544736,
+            "trackId": 1797544739,
+            "artistName": "gini",
+            "collectionName": "Aashiyan - Single",
+            "trackName": "Aashiyan",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/91/ab/be/91abbe40-f685-8aaf-a19c-0c6f287fff90/196872907414.jpg/100x100bb.jpg",
+            "releaseDate": "2025-03-06T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 174222
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1629686589,
+            "trackId": 1629686591,
+            "artistName": "gini",
+            "collectionName": "Negative Space - Single",
+            "trackName": "Negative Space",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/dc/61/7c/dc617c37-2bc6-0f3d-6eac-35dabb1c038f/198003825536.jpg/100x100bb.jpg",
+            "releaseDate": "2022-06-17T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 182222
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1443943948,
+            "collectionId": 1835401127,
+            "trackId": 1835401128,
+            "artistName": "Tsumyoki & gini",
+            "collectionName": "Don't Even Text - Single",
+            "trackName": "Don't Even Text",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/95/95/c0/9595c097-fade-9f54-90d6-fcd43b6624c5/25UM1IM23959.rgb.jpg/100x100bb.jpg",
+            "releaseDate": "2025-08-28T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 179644
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1834448315,
+            "collectionId": 6800061463,
+            "trackId": 6800061464,
+            "artistName": "Noor House & gini",
+            "collectionName": "Khauf (Live from 'STRUNGOVER SESSIONS') - Single",
+            "trackName": "Khauf (Live from 'STRUNGOVER SESSIONS')",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/56/dd/c2/56ddc217-2537-0c63-d7e4-817980e3f892/26UM1IM04020.rgb.jpg/100x100bb.jpg",
+            "releaseDate": "2026-08-13T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 235500
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1834448315,
+            "collectionId": 6791478696,
+            "trackId": 6791478697,
+            "artistName": "Noor House, Janisht Joshi & gini",
+            "collectionName": "Ab Na Laut Paayenge (Live From \"STRUNGOVER SESSIONS\") - Single",
+            "trackName": "Ab Na Laut Paayenge (Live From \"STRUNGOVER SESSIONS\")",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/ae/c8/09/aec80977-ffd0-ac2a-473a-263371029dc8/196874610190.jpg/100x100bb.jpg",
+            "releaseDate": "2026-07-17T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 179167
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1871378604,
+            "trackId": 1871378610,
+            "artistName": "gini & NEVERSOBER",
+            "collectionName": "Feeka - Single",
+            "trackName": "Feeka",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/53/f8/b3/53f8b3b9-9c56-22b9-00f0-fcc5486f7877/196874042175.jpg/100x100bb.jpg",
+            "releaseDate": "2026-02-04T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 163500
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1734952475,
+            "trackId": 1734952486,
+            "artistName": "gini",
+            "collectionName": "Ansuna - Single",
+            "trackName": "Ansuna",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/e5/b9/45/e5b94551-39c3-f318-a30b-20e442c97481/198391462665.jpg/100x100bb.jpg",
+            "releaseDate": "2024-04-03T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 224651
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 334329518,
+            "collectionId": 6788006770,
+            "trackId": 6788006831,
+            "artistName": "Jakes Bejoy, gini & Siddhant Kaushal",
+            "collectionName": "I, Nobody (Original Motion Picture Soundtrack)",
+            "trackName": "Jaadui Subah",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/4f/8b/71/4f8b710a-0e82-ea5e-d471-0b29d71e1363/196874582435.jpg/100x100bb.jpg",
+            "releaseDate": "2026-07-07T12:00:00Z",
+            "trackCount": 9,
+            "trackTimeMillis": 207222
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1661263532,
+            "collectionId": 1890187570,
+            "trackId": 1890188071,
+            "artistName": "Janisht Joshi, gini & sudan",
+            "collectionName": "Talkhiyaan - EP",
+            "trackName": "Ab Na Laut Paayenge",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/7b/24/75/7b24757e-04e8-755d-2a90-789d92b6a0ee/196874271650.jpg/100x100bb.jpg",
+            "releaseDate": "2026-05-10T12:00:00Z",
+            "trackCount": 5,
+            "trackTimeMillis": 182068
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1764063356,
+            "trackId": 1764063367,
+            "artistName": "gini",
+            "collectionName": "Aasaan - Single",
+            "trackName": "Aasaan",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/54/fe/09/54fe0996-86d7-5a95-4f7b-c0a3688c44e1/198846139210.jpg/100x100bb.jpg",
+            "releaseDate": "2024-08-30T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 188000
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1747502224,
+            "collectionId": 1891641381,
+            "trackId": 1891642293,
+            "artistName": "faizal, gini, Faizan & Ezra Montoyo",
+            "collectionName": "MAQSAD",
+            "trackName": "MONA LISA (feat. Katoptris)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/6c/2f/1e/6c2f1e5b-793c-5ee2-fdee-5058c02c6856/820200982902.jpg/100x100bb.jpg",
+            "releaseDate": "2026-04-30T12:00:00Z",
+            "trackCount": 15,
+            "trackTimeMillis": 218640
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1750244750,
+            "trackId": 1750244764,
+            "artistName": "gini",
+            "collectionName": "Chaukhat (Acoustic) - Single",
+            "trackName": "Chaukhat (Acoustic)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/5f/00/fe/5f00fe22-28a6-d932-e3b6-c1f1450aecde/198588303139.jpg/100x100bb.jpg",
+            "releaseDate": "2024-06-21T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 233875
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1834448315,
+            "collectionId": 6801465166,
+            "trackId": 6801465171,
+            "artistName": "Noor House & gini",
+            "collectionName": "Sukoon (Live from ‘STRUNGOVER SESSIONS’) - Single",
+            "trackName": "Sukoon (Live from ‘STRUNGOVER SESSIONS’)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/ea/0d/0b/ea0d0b2f-8963-2336-5c1e-eef47052bf7f/26UM1IM04237.rgb.jpg/100x100bb.jpg",
+            "releaseDate": "2026-08-27T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 212903
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1504289792,
+            "collectionId": 1810289810,
+            "trackId": 1810289838,
+            "artistName": "citimall & gini",
+            "collectionName": "Har Subah - Single",
+            "trackName": "Har Subah",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/f9/b5/aa/f9b5aa75-9817-4fce-e41d-13338fdcf0ee/25UMGIM59332.rgb.jpg/100x100bb.jpg",
+            "releaseDate": "2025-05-02T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 219052
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1595489611,
+            "collectionId": 1880097627,
+            "trackId": 1880097640,
+            "artistName": "Chaar Diwaari, gini & Indian Ocean",
+            "collectionName": "Parvana - EP",
+            "trackName": "Aashiqana",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/7a/0d/a3/7a0da341-8769-4b81-b3d5-a85a5f630929/26UMGIM21264.rgb.jpg/100x100bb.jpg",
+            "releaseDate": "2026-02-26T12:00:00Z",
+            "trackCount": 6,
+            "trackTimeMillis": 403580
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1650334265,
+            "trackId": 1650334268,
+            "artistName": "gini & Tansen.",
+            "collectionName": "Jugnoo - Single",
+            "trackName": "Jugnoo",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/c2/d9/9d/c2d99d59-967d-d37f-4d03-ce0e1dffde44/198004765190.jpg/100x100bb.jpg",
+            "releaseDate": "2022-10-28T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 180167
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1447871805,
+            "collectionId": 1571487655,
+            "trackId": 1571487656,
+            "artistName": "CZA & gini",
+            "collectionName": "Falling Asleep - Single",
+            "trackName": "Falling Asleep",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/c1/8e/61/c18e616c-24a4-ff51-1bb9-a19a4a62fcc7/6080b83b-53ee-4ac5-b34b-1148fb54abcc.jpg/100x100bb.jpg",
+            "releaseDate": "2021-06-23T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 178286
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1650022627,
+            "trackId": 1650022629,
+            "artistName": "gini",
+            "collectionName": "So Far Away - Single",
+            "trackName": "So Far Away",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/b6/40/48/b6404891-2f94-253b-5850-84410cb7181e/198004746243.jpg/100x100bb.jpg",
+            "releaseDate": "2022-10-16T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 150638
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1520030744,
+            "collectionId": 1876792076,
+            "trackId": 1876792078,
+            "artistName": "ofRO & Asal Kolaar",
+            "collectionName": "Matta Gaana (feat. gini) [From \"Atti Culture\"] - Single",
+            "trackName": "Matta Gaana (feat. gini) [From \"Atti Culture\"]",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/78/53/c5/7853c5a6-87bf-9591-410e-8dac3ef0302c/cover.jpg/100x100bb.jpg",
+            "releaseDate": "2026-02-13T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 193125
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1576092046,
+            "collectionId": 1813096517,
+            "trackId": 1813096519,
+            "artistName": "Shy Wry & Vedang",
+            "collectionName": "NAAM KYA? (feat. gini) - Single",
+            "trackName": "NAAM KYA? (feat. gini)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/0a/46/9f/0a469f69-4266-0008-b20a-90e36289a567/199350556272.jpg/100x100bb.jpg",
+            "releaseDate": "2025-05-23T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 133939
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1441800480,
+            "collectionId": 1745368637,
+            "trackId": 1745368668,
+            "artistName": "Venserto",
+            "collectionName": "Keemat (feat. Gini) - Single",
+            "trackName": "Keemat (feat. Gini)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/9e/d0/03/9ed0038d-a6f2-fd97-4a13-90550b17a335/artwork.jpg/100x100bb.jpg",
+            "releaseDate": "2024-05-11T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 330000
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1661263532,
+            "collectionId": 1837668765,
+            "trackId": 1837669044,
+            "artistName": "Janisht Joshi",
+            "collectionName": "Nahi - Single",
+            "trackName": "Nahi (feat. gini) [Home Recording]",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/e7/83/04/e7830483-f8e5-98c0-a677-114bb1bd979b/199538723113.jpg/100x100bb.jpg",
+            "releaseDate": "2025-09-19T12:00:00Z",
+            "trackCount": 2,
+            "trackTimeMillis": 184762
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1629301422,
+            "collectionId": 1835635335,
+            "trackId": 1835635336,
+            "artistName": "gini & UNPLG'd",
+            "collectionName": "Naadaani (Acoustic) - Single",
+            "trackName": "Naadaani (Acoustic)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music221/v4/b6/cf/ad/b6cfad53-7ff7-dcfa-94fc-2e1d38db93c9/196873555027.jpg/100x100bb.jpg",
+            "releaseDate": "2025-08-29T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 88286
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1667030280,
+            "collectionId": 1879085232,
+            "trackId": 1879085238,
+            "artistName": "NOUMAD & Aryan Nabar",
+            "collectionName": "Places We Could Stop - EP",
+            "trackName": "Intzaar (feat. Amenn Wihaan & gini)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/4a/c5/7a/4ac57a93-ed67-4200-ae7a-828d6e6c29df/8721093310297.jpg/100x100bb.jpg",
+            "releaseDate": "2024-07-06T12:00:00Z",
+            "trackCount": 5,
+            "trackTimeMillis": 259201
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1657432062,
+            "collectionId": 1821379825,
+            "trackId": 1821379829,
+            "artistName": "Amenn Wihaan",
+            "collectionName": "TABEER",
+            "trackName": "OH DARIYA (feat. gini & Stephen Palakhe)",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/b5/60/d3/b560d39f-d37c-ed50-8fe3-cc5634b0de29/354152.jpg/100x100bb.jpg",
+            "releaseDate": "2025-08-01T12:00:00Z",
+            "trackCount": 9,
+            "trackTimeMillis": 270000
+          },
+          {
+            "wrapperType": "track",
+            "kind": "song",
+            "artistId": 1452960023,
+            "collectionId": 6810043221,
+            "trackId": 6810043223,
+            "artistName": "Vilva",
+            "collectionName": "Matta Gaana (feat. ofRO, Asal Kolaar & Gini) [Remix] - Single",
+            "trackName": "Matta Gaana (feat. ofRO, Asal Kolaar & Gini) [Remix]",
+            "artworkUrl100": "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/2c/32/4d/2c324d7d-42e7-79b6-7ca3-cd42843d6bf7/cover.jpg/100x100bb.jpg",
+            "releaseDate": "2026-09-09T12:00:00Z",
+            "trackCount": 1,
+            "trackTimeMillis": 183750
+          }
+        ]
+      }
+    },
+    {
+      "label": "apple-search-gini",
+      "url": "https://itunes.apple.com/search?term=gini&entity=musicArtist&limit=20",
+      "data": {
+        "results": [
+          {
+            "wrapperType": "artist",
+            "artistName": "gini",
+            "artistId": 1629301422
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "GINI",
+            "artistId": 1452486049
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Gini",
+            "artistId": 1492772785
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Lamborghini Gini",
+            "artistId": 883808313
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Gini Santana",
+            "artistId": 1615125772
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "GINI'",
+            "artistId": 1512211910
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Bruno Gini",
+            "artistId": 251784725
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "GïNI",
+            "artistId": 1731952721
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Gini",
+            "artistId": 294173565
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Roberto Gini",
+            "artistId": 159698823
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Dream Theater",
+            "artistId": 730091
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Gini",
+            "artistId": 1790895354
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Gini",
+            "artistId": 1449504014
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "gini",
+            "artistId": 1691873227
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Mike Mangini",
+            "artistId": 30462671
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Gustavo Gini",
+            "artistId": 172099121
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Gini Santana",
+            "artistId": 1564555797
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Roberto Gini",
+            "artistId": 1555677867
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AV & Lamborghini Gini",
+            "artistId": 656356695
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "King Gini",
+            "artistId": 347508516
+          }
+        ]
+      }
+    },
+    {
+      "label": "apple-search-Phoenix",
+      "url": "https://itunes.apple.com/search?term=Phoenix&entity=musicArtist&limit=50",
+      "data": {
+        "results": [
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 5500360
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1638410238
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1695599909
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1749158803
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 340621939
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1711865654
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1523304897
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1633957929
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 417478423
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1763091143
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1790707477
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phœnix",
+            "artistId": 1823006523
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Nick Phoenix",
+            "artistId": 373383454
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1830517648
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1889319937
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1730538375
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 340635902
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1598395641
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Vaughan Phoenix",
+            "artistId": 385131608
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 433133268
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Iberian Wolves",
+            "artistId": 1439787142
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 473251922
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "phoenix",
+            "artistId": 1780234250
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1799270349
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1746818862
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1352517078
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1526695952
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1517660881
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1084793295
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1450099753
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1483125462
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1535074791
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1885469264
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Joaquin Phoenix",
+            "artistId": 95221335
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1334300490
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1139465420
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1878496914
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1334300491
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "phoenix_",
+            "artistId": 1696546836
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "PHOENIX",
+            "artistId": 1693557097
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1667639557
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1303835917
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1695599908
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 525152247
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1477052462
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1367197715
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 417476569
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 350184352
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Phoenix",
+            "artistId": 1704844618
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "phoenix",
+            "artistId": 1585293774
+          }
+        ]
+      }
+    },
+    {
+      "label": "apple-search-Aurora",
+      "url": "https://itunes.apple.com/search?term=Aurora&entity=musicArtist&limit=50",
+      "data": {
+        "results": [
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 947171999
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "aurora",
+            "artistId": 1477374986
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 82834259
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 977879267
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1282549042
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 499991666
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 696241855
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 436576589
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 960469117
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 1737287780
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 1658568861
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora Aksnes",
+            "artistId": 587430197
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 589389532
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 960466639
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AuRORA",
+            "artistId": 1679679836
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 804935898
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 505721017
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1534778264
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 934110422
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1437859677
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 6780512524
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Raveena Aurora",
+            "artistId": 551778640
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1065127993
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AuRORA",
+            "artistId": 351841
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 1890493032
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 960465642
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1782979980
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 300364431
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora Beats",
+            "artistId": 1347196931
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 152549202
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Auróra",
+            "artistId": 454805306
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 842416554
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 980665140
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora Orchestra",
+            "artistId": 279717505
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 534829403
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 977983717
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1783129016
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "오로라",
+            "artistId": 532433673
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora Olivas",
+            "artistId": 1452972696
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1744201687
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1862090832
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 1896569750
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1195027013
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Sounds of Aurora",
+            "artistId": 1747706108
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 1693418079
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1726400547
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AurorA",
+            "artistId": 1638953938
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Aurora",
+            "artistId": 1696092943
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "Au Rora",
+            "artistId": 1514324092
+          },
+          {
+            "wrapperType": "artist",
+            "artistName": "AURORA",
+            "artistId": 1735552400
+          }
+        ]
+      }
+    },
+    {
+      "label": "brainz-search-gini",
+      "url": "https://musicbrainz.org/ws/2/artist?query=artist%3Agini&fmt=json&limit=10",
+      "error": "AssertionError [ERR_ASSERTION]: HTTP 503"
+    }
+  ]
+}

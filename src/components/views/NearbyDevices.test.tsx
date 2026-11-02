@@ -38,3 +38,20 @@ it('uses a single reconnect status instead of stacking connection error alerts',
   expect(html.match(/Cannot reach paired device/g)).toHaveLength(1);
 });
 
+it('detects connected phone on host and collapses the pairing QR code', () => {
+  const html = renderToStaticMarkup(
+    <NearbyDevices
+      nearby={{
+        ...nearby,
+        hostLink,
+        lastSyncedAt: Date.now(),
+        peer: { deviceId: 'phone-123', name: 'Android Phone', lastSeen: Date.now() },
+      }}
+    />
+  );
+  expect(html).toContain('Connected to Android Phone');
+  expect(html).toContain('Show pairing code / Pair another device');
+  expect(html).toContain('Sync now');
+  expect(html).toContain('Stop sharing');
+});
+

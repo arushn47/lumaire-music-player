@@ -1,0 +1,6 @@
+.source-chooser { width: min(640px, calc(100vw - 32px)); max-height: 85dvh; overflow-y: auto; }
+.source-chooser header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.source-chooser p { overflow-wrap: anywhere; }
+.source-chooser ul { display: grid; gap: 16px; list-style: none; padding: 0; }
+.source-chooser li { border: 1px solid var(--border, #444); border-radius: 12px; padding: 16px; }
+.source-chooser li p { margin: 8px 0; }

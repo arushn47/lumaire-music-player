@@ -10,8 +10,16 @@ const BASE: &str = "https://www.jiosaavn.com/api.php";
 
 pub(crate) fn valid_catalog_id(id: &str) -> bool {
     id.strip_prefix("saavn:").is_some_and(valid_id)
-        || id.strip_prefix("itunes:").is_some_and(|value| value.parse::<u64>().is_ok_and(|n| n > 0 && value == n.to_string()))
-        || id.strip_prefix("musicbrainz:recording:").is_some_and(|value| uuid::Uuid::parse_str(value).is_ok_and(|id| id.to_string() == value))
+        || id.strip_prefix("itunes:").is_some_and(|value| {
+            value
+                .parse::<u64>()
+                .is_ok_and(|n| n > 0 && value == n.to_string())
+        })
+        || id
+            .strip_prefix("musicbrainz:recording:")
+            .is_some_and(|value| {
+                uuid::Uuid::parse_str(value).is_ok_and(|id| id.to_string() == value)
+            })
 }
 
 fn valid_id(id: &str) -> bool {
@@ -66,7 +74,9 @@ fn artwork(value: &Value) -> Option<String> {
 
 pub(crate) fn artist_names(value: &str) -> Vec<String> {
     let mut names = crate::lyric_identity::credits(value);
-    if names.len() > 1 { names.remove(0); }
+    if names.len() > 1 {
+        names.remove(0);
+    }
     names
 }
 
@@ -75,31 +85,29 @@ fn credits(value: &Value) -> Vec<itunes_metadata::CatalogArtistCredit> {
     ["primary_artists", "featured_artists"]
         .iter()
         .flat_map(|key| value[key].as_array().into_iter().flatten())
-        .flat_map(|artist| {
-            let names = name(&artist["name"]).map(|name| {
-                if !name.contains([',', ';']) && !name.to_lowercase().contains(" and ") { vec![name] } else { artist_names(&name) }
-            }).unwrap_or_default();
-            let single = names.len() == 1;
-            names.into_iter().map(move |name| {
-                let id = if single { entity_id(&artist["id"]).map(|id| format!("saavn:artist:{id}")) } else { None }
-                    .unwrap_or_else(|| format!("saavn:artist:name:{}", urlencoding::encode(&name)));
-                itunes_metadata::CatalogArtistCredit { name, id: Some(id) }
+        .filter_map(|artist| {
+            Some(itunes_metadata::CatalogArtistCredit {
+                name: name(&artist["name"])?,
+                id: entity_id(&artist["id"]).map(|id| format!("saavn:artist:{id}")),
             })
         })
-        .filter(|credit| seen.insert(credit.name.to_lowercase()))
+        .filter(|credit| seen.insert((credit.id.clone(), credit.name.clone())))
         .collect()
+}
+
+pub(crate) fn valid_artist_id(id: &str) -> bool {
+    id.strip_prefix("saavn:artist:")
+        .or_else(|| id.strip_prefix("itunes:"))
+        .is_some_and(|source| entity_id(&Value::String(source.into())).is_some())
+        || id
+            .strip_prefix("musicbrainz:artist:")
+            .is_some_and(|source| {
+                uuid::Uuid::parse_str(source).is_ok_and(|id| id.to_string() == source)
+            })
 }
 
 pub(crate) fn same_name(left: &str, right: &str) -> bool {
     left.trim().to_lowercase() == right.trim().to_lowercase()
-}
-
-fn canonical_artist_lookup_name(value: &str) -> String {
-    if value.eq_ignore_ascii_case("Emiway") || value.eq_ignore_ascii_case("Emiway Bantai") {
-        "Emiway Bantai".into()
-    } else {
-        value.into()
-    }
 }
 
 fn track(value: &Value) -> Option<CatalogTrack> {
@@ -126,8 +134,21 @@ fn track(value: &Value) -> Option<CatalogTrack> {
     let album_id = entity_id(&info["album_id"]).map(|id| format!("saavn:album:{id}"));
     let artwork_url = artwork(&value["image"]);
     Some(CatalogTrack {
-        play_count: info["play_count"].as_u64().or_else(|| info["play_count"].as_str()?.parse().ok()).or_else(|| value["play_count"].as_u64()).or_else(|| value["play_count"].as_str()?.parse().ok()).filter(|count| *count > 0),
-        genre: name(&info["genre"]),
+        recording_metadata: crate::recording_metadata::from_provider(
+            format!("saavn:{id}"),
+            &info["isrc"],
+            value["release_date"]
+                .as_str()
+                .or_else(|| info["release_date"].as_str()),
+            &serde_json::Value::Null,
+        ),
+        play_count: info["play_count"]
+            .as_u64()
+            .or_else(|| info["play_count"].as_str()?.parse().ok())
+            .or_else(|| value["play_count"].as_u64())
+            .or_else(|| value["play_count"].as_str()?.parse().ok())
+            .filter(|count| *count > 0),
+        genre: name(&info["genre"]).or_else(|| name(&info["primary_genre_name"])),
         language: name(&value["language"]).or_else(|| name(&info["language"])),
         id: format!("saavn:{id}"),
         title,
@@ -145,11 +166,22 @@ async fn request(base: &str, operation: &str, params: &[(&str, String)]) -> Resu
     request_context(base, operation, params, "web6dot0").await
 }
 
-async fn request_context(base: &str, operation: &str, params: &[(&str, String)], context: &str) -> Result<Value, String> {
+async fn request_context(
+    base: &str,
+    operation: &str,
+    params: &[(&str, String)],
+    context: &str,
+) -> Result<Value, String> {
     request_context_cookie(base, operation, params, context, "").await
 }
 
-async fn request_context_cookie(base: &str, operation: &str, params: &[(&str, String)], context: &str, cookie: &str) -> Result<Value, String> {
+async fn request_context_cookie(
+    base: &str,
+    operation: &str,
+    params: &[(&str, String)],
+    context: &str,
+    cookie: &str,
+) -> Result<Value, String> {
     // shortcut: public metadata endpoints are undocumented; revisit if their response shape changes.
     let mut query = vec![
         ("__call", operation.into()),
@@ -172,7 +204,11 @@ async fn request_context_cookie(base: &str, operation: &str, params: &[(&str, St
         .map_err(|_| "Invalid music catalog response.".into())
 }
 
-pub(crate) async fn search_from(base: &str, query: &str, limit: u32) -> Result<Vec<CatalogTrack>, String> {
+pub(crate) async fn search_from(
+    base: &str,
+    query: &str,
+    limit: u32,
+) -> Result<Vec<CatalogTrack>, String> {
     let response = request(
         base,
         "search.getResults",
@@ -193,6 +229,18 @@ pub(crate) async fn search_from(base: &str, query: &str, limit: u32) -> Result<V
         .filter(|track| seen.insert(track.id.clone()))
         .take(limit as usize)
         .collect())
+}
+
+#[tauri::command]
+pub async fn search_catalog_records(
+    query: String,
+    limit: Option<u32>,
+) -> Result<Vec<CatalogTrack>, String> {
+    let query = query.trim();
+    if !(1..=200).contains(&query.chars().count()) || query.chars().any(char::is_control) {
+        return Err("Enter a catalog search between 1 and 200 characters.".into());
+    }
+    crate::catalog_search::search_records(query, limit.unwrap_or(60).clamp(1, 60) as usize).await
 }
 
 #[tauri::command]
@@ -225,7 +273,9 @@ async fn lookup_from(base: &str, id: &str) -> Result<CatalogTrack, String> {
 
 #[tauri::command]
 pub async fn lookup_catalog(id: String) -> Result<CatalogTrack, String> {
-    if id.starts_with("musicbrainz:recording:") { return crate::brainz_catalog::lookup(&id).await; }
+    if id.starts_with("musicbrainz:recording:") {
+        return crate::brainz_catalog::lookup(&id).await;
+    }
     if id.starts_with("itunes:") {
         return itunes_metadata::lookup_catalog(id).await;
     }
@@ -235,36 +285,73 @@ pub async fn lookup_catalog(id: String) -> Result<CatalogTrack, String> {
 fn radio_tracks(response: &Value) -> Vec<CatalogTrack> {
     let mut seen = HashSet::new();
     // Numeric station positions carry the provider's radio ranking; metadata fields do not.
-    (0..30).filter_map(|i| {
-        let row = &response[i.to_string()]["song"];
-        track(row)
-    }).filter(|song| seen.insert(song.id.clone())).collect()
+    (0..30)
+        .filter_map(|i| {
+            let row = &response[i.to_string()]["song"];
+            track(row)
+        })
+        .filter(|song| seen.insert(song.id.clone()))
+        .collect()
 }
 
 async fn recommendations_from(base: &str, id: &str) -> Result<Vec<CatalogTrack>, String> {
-    let source = id.strip_prefix("saavn:").filter(|id| valid_id(id))
+    let source = id
+        .strip_prefix("saavn:")
+        .filter(|id| valid_id(id))
         .ok_or("Invalid radio seed track ID.")?;
     let details = request(base, "song.getDetails", &[("pids", source.into())]).await?;
-    details["songs"].as_array().and_then(|rows| rows.iter().find(|row| row["id"].as_str() == Some(source) && track(row).is_some()))
+    details["songs"]
+        .as_array()
+        .and_then(|rows| {
+            rows.iter()
+                .find(|row| row["id"].as_str() == Some(source) && track(row).is_some())
+        })
         .ok_or("This radio seed is unavailable.")?;
-    let station = request_context(base, "webradio.createEntityStation", &[
-        ("entity_id", serde_json::json!([source]).to_string()), ("entity_type", "queue".into())
-    ], "android").await?;
-    let station_id = station["stationid"].as_str().filter(|value| !value.is_empty() && value.len() <= 512 && !value.chars().any(char::is_control))
+    let station = request_context(
+        base,
+        "webradio.createEntityStation",
+        &[
+            ("entity_id", serde_json::json!([source]).to_string()),
+            ("entity_type", "queue".into()),
+        ],
+        "android",
+    )
+    .await?;
+    let station_id = station["stationid"]
+        .as_str()
+        .filter(|value| {
+            !value.is_empty() && value.len() <= 512 && !value.chars().any(char::is_control)
+        })
         .ok_or("Song radio is temporarily unavailable.")?;
-    let response = request_context(base, "webradio.getSong", &[("stationid", station_id.into()), ("k", "30".into())], "android").await?;
+    let response = request_context(
+        base,
+        "webradio.getSong",
+        &[("stationid", station_id.into()), ("k", "30".into())],
+        "android",
+    )
+    .await?;
     Ok(radio_tracks(&response))
 }
 
 #[tauri::command]
 pub async fn recommend_catalog(id: String) -> Result<Vec<CatalogTrack>, String> {
-    if id.starts_with("saavn:") { return recommendations_from(BASE, &id).await; }
+    if id.starts_with("saavn:") {
+        return recommendations_from(BASE, &id).await;
+    }
     // Apple IDs must be matched to the same song before using the radio provider.
     let seed = lookup_catalog(id).await?;
-    let query = format!("{} {}", crate::lyric_identity::query_title(&seed.title), crate::lyric_identity::primary_artist(&seed.artist));
-    let matched = search_from(BASE, &query.chars().take(200).collect::<String>(), 10).await?
-        .into_iter().find(|song| crate::lyric_identity::title(&song.title) == crate::lyric_identity::title(&seed.title)
-            && crate::lyric_identity::artists_match(&song.artist, &seed.artist))
+    let query = format!(
+        "{} {}",
+        crate::lyric_identity::query_title(&seed.title),
+        crate::lyric_identity::primary_artist(&seed.artist)
+    );
+    let matched = search_from(BASE, &query.chars().take(200).collect::<String>(), 10)
+        .await?
+        .into_iter()
+        .find(|song| {
+            crate::lyric_identity::title(&song.title) == crate::lyric_identity::title(&seed.title)
+                && crate::lyric_identity::artists_match(&song.artist, &seed.artist)
+        })
         .ok_or("No matching song radio was found.")?;
     recommendations_from(BASE, &matched.id).await
 }
@@ -272,6 +359,18 @@ pub async fn recommend_catalog(id: String) -> Result<Vec<CatalogTrack>, String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn recording_identifiers_propagate_without_changing_catalogue_identity() {
+        let mut row = song();
+        row["more_info"]["isrc"] = "INABC2312345".into();
+        row["release_date"] = "2023-08-10".into();
+        let parsed = track(&row).unwrap();
+        let details = parsed.recording_metadata.unwrap();
+        assert_eq!(parsed.id, "saavn:QAbmbZ7O");
+        assert_eq!(details.source_id, parsed.id);
+        assert_eq!(details.isrcs, ["INABC2312345"]);
+        assert_eq!(details.release_date.as_deref(), Some("2023-08-10"));
+    }
     fn song() -> Value {
         serde_json::json!({"id":"QAbmbZ7O","type":"song","title":"Sensitive &amp; &#039;Sure&#039;",
         "image":"https://c.saavncdn.com/517/album-150x150.jpg", "more_info":{
@@ -279,42 +378,75 @@ mod tests {
         }})
     }
     #[test]
-    fn entity_search_returns_a_single_matching_artist_from_joint_provider_entries() {
+    fn entity_search_preserves_joint_provider_identity() {
         let (base, server) = provider_http::tests::server(vec![
             ("200 OK", serde_json::json!({"results":[{"id":"42","name":"Hasan Raheem, Abdullah and Talal Qureshi","type":"artist"}]}).to_string()),
             ("200 OK", serde_json::json!({"results":[]}).to_string()),
         ]);
-        let result = runtime().block_on(search_entities_from(&base, "Hasan Raheem")).unwrap();
+        let result = runtime()
+            .block_on(search_entities_from(&base, "Hasan Raheem"))
+            .unwrap();
         assert_eq!(result.artists.len(), 1);
-        assert_eq!(result.artists[0].name, "Hasan Raheem");
-        assert_eq!(result.artists[0].id, "saavn:artist:name:Hasan%20Raheem");
+        assert_eq!(
+            result.artists[0].name,
+            "Hasan Raheem, Abdullah and Talal Qureshi"
+        );
+        assert_eq!(result.artists[0].id, "saavn:artist:42");
         assert_eq!(server.join().unwrap().len(), 2);
     }
     #[test]
-    fn collaboration_credits_use_individual_names_without_borrowing_the_joint_id() {
+    fn structured_credits_preserve_joint_provider_identity() {
         let value = serde_json::json!({"primary_artists":[{"id":"42","name":"Hasan Raheem, Abdullah and Talal Qureshi"}]});
         let credits = credits(&value);
-        assert_eq!(credits.iter().map(|credit| credit.name.as_str()).collect::<Vec<_>>(), ["Hasan Raheem", "Abdullah", "Talal Qureshi"]);
-        assert!(credits.iter().all(|credit| credit.id.as_deref().unwrap().starts_with("saavn:artist:name:")));
+        assert_eq!(
+            credits
+                .iter()
+                .map(|credit| credit.name.as_str())
+                .collect::<Vec<_>>(),
+            ["Hasan Raheem, Abdullah and Talal Qureshi"]
+        );
+        assert_eq!(credits[0].id.as_deref(), Some("saavn:artist:42"));
     }
     #[test]
     fn song_radio_preserves_languages_and_validated_metadata_in_provider_order() {
-        let mut seed = song(); seed["language"] = "urdu".into();
-        let mut same = seed.clone(); same["id"] = "abcdefgh".into();
-        let mut other = seed.clone(); other["id"] = "ijklmnop".into(); other["language"] = "english".into();
+        let mut seed = song();
+        seed["language"] = "urdu".into();
+        let mut same = seed.clone();
+        same["id"] = "abcdefgh".into();
+        let mut other = seed.clone();
+        other["id"] = "ijklmnop".into();
+        other["language"] = "english".into();
         let response = serde_json::json!({"0":{"song":same},"1":{"song":other},"2":{"song":same},"3":{"song":{"id":"bad"}},"stationid":"temporary"});
-        assert_eq!(radio_tracks(&response).iter().map(|row| row.id.as_str()).collect::<Vec<_>>(), vec!["saavn:abcdefgh", "saavn:ijklmnop"]);
+        assert_eq!(
+            radio_tracks(&response)
+                .iter()
+                .map(|row| row.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["saavn:abcdefgh", "saavn:ijklmnop"]
+        );
         let (base, server) = crate::provider_http::tests::server(vec![
             ("200 OK", serde_json::json!({"songs":[seed]}).to_string()),
-            ("200 OK", serde_json::json!({"stationid":"temporary"}).to_string()),
+            (
+                "200 OK",
+                serde_json::json!({"stationid":"temporary"}).to_string(),
+            ),
             ("200 OK", response.to_string()),
         ]);
-        let songs = runtime().block_on(recommendations_from(&base, "saavn:QAbmbZ7O")).unwrap();
+        let songs = runtime()
+            .block_on(recommendations_from(&base, "saavn:QAbmbZ7O"))
+            .unwrap();
         assert_eq!(songs.len(), 2);
         let requests = server.join().unwrap();
-        assert!(requests[1].contains("webradio.createEntityStation") && requests[1].contains("ctx=android"));
-        assert!(requests[2].contains("webradio.getSong") && requests[2].contains("stationid=temporary"));
-        assert!(runtime().block_on(recommendations_from(&base, "saavn:bad")).is_err());
+        assert!(
+            requests[1].contains("webradio.createEntityStation")
+                && requests[1].contains("ctx=android")
+        );
+        assert!(
+            requests[2].contains("webradio.getSong") && requests[2].contains("stationid=temporary")
+        );
+        assert!(runtime()
+            .block_on(recommendations_from(&base, "saavn:bad"))
+            .is_err());
     }
     fn runtime() -> tokio::runtime::Runtime {
         tokio::runtime::Builder::new_current_thread()
@@ -519,34 +651,97 @@ mod tests {
     }
 
     #[test]
-    fn legacy_emiway_links_use_the_full_artist_credit() {
-        assert_eq!(canonical_artist_lookup_name("Emiway"), "Emiway Bantai");
-        assert_eq!(canonical_artist_lookup_name("EMIWAY BANTAI"), "Emiway Bantai");
-        assert_eq!(canonical_artist_lookup_name("Emiway Tribute"), "Emiway Tribute");
+    fn artist_reads_live_nested_lists_and_rejects_empty_publishing_pages() {
+        let mut row = song();
+        row["more_info"]["artistMap"]["primary_artists"][0]["id"] = "123456".into();
+        row["more_info"]["album_id"] = "42".into();
+        let mut response = serde_json::json!({"artistId":"123456", "name":"KR$NA",
+            "topSongs":{"songs":[row],"total":1},
+            "topAlbums":{"albums":[{"id":"42","title":"Yours Truly","more_info":{"artistMap":{"primary_artists":[{"id":"123456","name":"KR$NA"}]}}}],"total":1}});
+        let artist = artist_details("123456", &response).unwrap();
+        assert_eq!(artist.top_tracks.len(), 1);
+        assert_eq!(artist.albums.len(), 1);
+        response["topSongs"]["songs"] = serde_json::json!([]);
+        assert_eq!(artist_details("123456", &response).unwrap().albums.len(), 1);
+        response["topAlbums"]["albums"] = serde_json::json!([]);
+        response["name"] = "Jackie Young Music/Hola Amigo Songs".into();
+        assert!(artist_details("123456", &response).is_err());
     }
 
     #[test]
-    fn numeric_and_legacy_artist_links_use_the_correct_provider_operation() {
-        let runtime = runtime();
-        let response = serde_json::json!({"artistId":"123456", "name":"KR$NA"}).to_string();
-        let (base, server) = provider_http::tests::server(vec![("200 OK", response.clone())]);
-        let artist = runtime
-            .block_on(lookup_saavn_artist(&base, "saavn:artist:123456"))
-            .unwrap();
-        assert_eq!(artist.info.id, "saavn:artist:123456");
-        let requests = server.join().unwrap();
-        assert!(requests[0].contains("__call=artist.getArtistPageDetails"));
-        assert!(requests[0].contains("artistId=123456"));
-        let mut row = song();
-        row["more_info"]["artistMap"]["primary_artists"][0]["id"] = "123456".into();
-        let (base, server) = provider_http::tests::server(vec![
-            ("200 OK", serde_json::json!({"results":[row]}).to_string()),
-            ("200 OK", response),
-        ]);
-        assert!(runtime
-            .block_on(lookup_saavn_artist(&base, "saavn:artist:KR%24NA"))
-            .is_ok());
-        assert_eq!(server.join().unwrap().len(), 2);
+    fn name_only_links_never_assign_a_provider_identity() {
+        for id in [
+            "saavn:artist:name:gini",
+            "saavn:artist:Emiway",
+            "saavn:artist:001",
+            "saavn:artist:0",
+        ] {
+            assert!(runtime()
+                .block_on(lookup_saavn_artist("invalid", id))
+                .is_err());
+        }
+    }
+
+    #[test]
+    fn captured_provider_profiles_retain_exact_credits_and_releases() {
+        let corpus: Value = serde_json::from_str(include_str!(
+            "../../tests/fixtures/artist-identity-live.json"
+        ))
+        .unwrap();
+        for source in ["1249318", "20043211"] {
+            let label = format!("saavn-artist-{source}");
+            let raw = corpus["responses"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|row| row["label"] == label)
+                .unwrap();
+            let profile = artist_details(source, &raw["data"]).unwrap();
+            assert_eq!(profile.info.id, format!("saavn:artist:{source}"));
+            assert!(profile.top_tracks.iter().all(|track| track
+                .artists
+                .iter()
+                .any(|credit| credit.id.as_deref() == Some(&profile.info.id))));
+            assert!(profile.albums.iter().all(|album| album
+                .artists
+                .iter()
+                .any(|credit| credit.id.as_deref() == Some(&profile.info.id))));
+            assert_eq!(
+                profile
+                    .top_tracks
+                    .iter()
+                    .any(|track| track.title == "Sukoon"),
+                source == "20043211"
+            );
+        }
+        let value = serde_json::json!({"primary_artists":[{"id":"1","name":"Gini"},{"id":"2","name":"Gini"},{"name":"gini"}],"featured_artists":[{"id":"3","name":"Guest"}]});
+        let parsed = credits(&value);
+        assert_eq!(parsed.len(), 4);
+        assert!(parsed[2].id.is_none());
+        let mut response = corpus["responses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["label"] == "saavn-artist-20043211")
+            .unwrap()["data"]
+            .clone();
+        let unrelated = corpus["responses"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|row| row["label"] == "saavn-artist-1249318")
+            .unwrap()["data"]["topSongs"]["songs"][0]
+            .clone();
+        response["topSongs"]["songs"]
+            .as_array_mut()
+            .unwrap()
+            .insert(0, unrelated);
+        assert!(!artist_details("20043211", &response)
+            .unwrap()
+            .top_tracks
+            .iter()
+            .any(|track| track.title == "Don't Even Text"));
+        assert!(artist_details("1249318", &response).is_err());
     }
 
     #[test]
@@ -673,6 +868,9 @@ pub struct CatalogAlbum {
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ArtistDetails {
+    #[serde(skip)]
+    pub evidence: Vec<itunes_metadata::CatalogTrack>,
+    pub verified_ids: Vec<String>,
     pub info: CatalogArtist,
     pub top_tracks: Vec<CatalogTrack>,
     pub albums: Vec<CatalogAlbum>,
@@ -727,29 +925,77 @@ fn album_summary(row: &Value) -> Option<CatalogAlbum> {
 }
 
 fn home_albums(response: &Value, language: &str) -> Result<Vec<CatalogAlbum>, String> {
-    let rows = response.as_array().ok_or("The discovery shelf is unavailable. Search music or try again later.")?;
+    let rows = response
+        .as_array()
+        .ok_or("The discovery shelf is unavailable. Search music or try again later.")?;
     let mut ids = HashSet::new();
     let mut editions = HashSet::new();
-    Ok(rows.iter().filter(|row| row["language"].as_str() == Some(language)).filter_map(|row| {
-        row.get("more_info")?.as_object()?.get("artistMap")?.as_object()?;
-        let mut row = row.clone();
-        // This feed puts album credits in artistMap.artists instead of primary_artists.
-        if credits(&row["more_info"]["artistMap"]).is_empty() {
-            row["more_info"]["artistMap"]["primary_artists"] = row["more_info"]["artistMap"]["artists"].clone();
-        }
-        let mut album = album_summary(&row)?;
-        album.year = album.year.or_else(|| row["more_info"]["release_date"].as_str()?.split('-').next()?.parse::<u32>().ok().filter(|year| (1900..=2200).contains(year)));
-        if !ids.insert(album.id.clone()) || (!album.artist.is_empty() && !editions.insert(format!("{}\0{}", album.title.to_lowercase(), album.artist.to_lowercase()))) { return None; }
-        Some(album)
-    }).take(12).collect())
+    Ok(rows
+        .iter()
+        .filter(|row| row["language"].as_str() == Some(language))
+        .filter_map(|row| {
+            row.get("more_info")?
+                .as_object()?
+                .get("artistMap")?
+                .as_object()?;
+            let mut row = row.clone();
+            // This feed puts album credits in artistMap.artists instead of primary_artists.
+            if credits(&row["more_info"]["artistMap"]).is_empty() {
+                row["more_info"]["artistMap"]["primary_artists"] =
+                    row["more_info"]["artistMap"]["artists"].clone();
+            }
+            let mut album = album_summary(&row)?;
+            album.year = album.year.or_else(|| {
+                row["more_info"]["release_date"]
+                    .as_str()?
+                    .split('-')
+                    .next()?
+                    .parse::<u32>()
+                    .ok()
+                    .filter(|year| (1900..=2200).contains(year))
+            });
+            if !ids.insert(album.id.clone())
+                || (!album.artist.is_empty()
+                    && !editions.insert(format!(
+                        "{}\0{}",
+                        album.title.to_lowercase(),
+                        album.artist.to_lowercase()
+                    )))
+            {
+                return None;
+            }
+            Some(album)
+        })
+        .take(12)
+        .collect())
 }
 
 #[tauri::command]
 pub async fn discover_albums(language: String) -> Result<Vec<CatalogAlbum>, String> {
-    if !["english", "hindi", "tamil", "telugu", "malayalam", "kannada", "punjabi", "bengali", "marathi"].contains(&language.as_str()) {
+    if ![
+        "english",
+        "hindi",
+        "tamil",
+        "telugu",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bengali",
+        "marathi",
+    ]
+    .contains(&language.as_str())
+    {
         return Err("Choose a supported discovery language.".into());
     }
-    let response = request(BASE, "content.getTrending", &[("entity_type", "album".into()), ("entity_language", language.clone())]).await?;
+    let response = request(
+        BASE,
+        "content.getTrending",
+        &[
+            ("entity_type", "album".into()),
+            ("entity_language", language.clone()),
+        ],
+    )
+    .await?;
     home_albums(&response, &language)
 }
 
@@ -784,21 +1030,39 @@ pub struct CatalogChart {
 }
 
 fn chart_summary(row: &Value) -> Option<CatalogChart> {
-    if row["type"].as_str() != Some("playlist") { return None; }
+    if row["type"].as_str() != Some("playlist") {
+        return None;
+    }
     Some(CatalogChart {
-        id: format!("saavn:chart:{}", entity_id(&row["id"])?), title: name(&row["title"])?,
+        id: format!("saavn:chart:{}", entity_id(&row["id"])?),
+        title: name(&row["title"])?,
         subtitle: name(&row["subtitle"]).unwrap_or_else(|| "JioSaavn".into()),
         artwork_url: artwork(&row["image"]),
-        track_count: positive_number(&row["list_count"]).or_else(|| positive_number(&row["more_info"]["song_count"])),
+        track_count: positive_number(&row["list_count"])
+            .or_else(|| positive_number(&row["more_info"]["song_count"])),
     })
 }
 
 fn chart_summaries(rows: &Value) -> Vec<CatalogChart> {
     let mut ids = HashSet::new();
     let mut titles = HashSet::new();
-    rows.as_array().into_iter().flatten().filter_map(chart_summary).filter(|chart| {
-        ids.insert(chart.id.clone()) && titles.insert(chart.title.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect::<String>())
-    }).take(40).collect()
+    rows.as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(chart_summary)
+        .filter(|chart| {
+            ids.insert(chart.id.clone())
+                && titles.insert(
+                    chart
+                        .title
+                        .to_lowercase()
+                        .chars()
+                        .filter(|c| c.is_alphanumeric())
+                        .collect::<String>(),
+                )
+        })
+        .take(40)
+        .collect()
 }
 
 fn original_trending_title(title: &str) -> bool {
@@ -808,29 +1072,59 @@ fn original_trending_title(title: &str) -> bool {
 
 fn homepage_trending(response: &Value) -> Vec<TrendingItem> {
     let mut seen = HashSet::new();
-    response["new_trending"].as_array().into_iter().flatten().filter_map(|row| {
-        if !original_trending_title(row["title"].as_str()?) { return None; }
-        let item = match row["type"].as_str()? {
-            "song" => TrendingItem::Song(track(row)?),
-            "album" => TrendingItem::Album(home_albums(&serde_json::json!([row]), row["language"].as_str().unwrap_or_default()).ok()?.into_iter().next()?),
-            _ => return None,
-        };
-        let id = match &item { TrendingItem::Song(item) => &item.id, TrendingItem::Album(item) => &item.id };
-        seen.insert(id.clone()).then_some(item)
-    }).take(24).collect()
+    response["new_trending"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|row| {
+            if !original_trending_title(row["title"].as_str()?) {
+                return None;
+            }
+            let item = match row["type"].as_str()? {
+                "song" => TrendingItem::Song(track(row)?),
+                "album" => TrendingItem::Album(
+                    home_albums(
+                        &serde_json::json!([row]),
+                        row["language"].as_str().unwrap_or_default(),
+                    )
+                    .ok()?
+                    .into_iter()
+                    .next()?,
+                ),
+                _ => return None,
+            };
+            let id = match &item {
+                TrendingItem::Song(item) => &item.id,
+                TrendingItem::Album(item) => &item.id,
+            };
+            seen.insert(id.clone()).then_some(item)
+        })
+        .take(24)
+        .collect()
 }
 
 fn release_shelves(response: &Value) -> Result<(Vec<CatalogAlbum>, Vec<CatalogTrack>), String> {
-    let rows = response["data"].as_array().ok_or("New releases are unavailable.")?;
+    let rows = response["data"]
+        .as_array()
+        .ok_or("New releases are unavailable.")?;
     let mut albums = Vec::new();
     let mut singles = Vec::new();
     let mut seen = HashSet::new();
     for row in rows {
         if row["type"] == "song" {
-            if let Some(song) = track(row) { if seen.insert(song.id.clone()) { singles.push(song); } }
+            if let Some(song) = track(row) {
+                if seen.insert(song.id.clone()) {
+                    singles.push(song);
+                }
+            }
         } else if let Some(language) = row["language"].as_str() {
-            if let Some(album) = home_albums(&serde_json::json!([row]), language)?.into_iter().next() {
-                if seen.insert(album.id.clone()) { albums.push(album); }
+            if let Some(album) = home_albums(&serde_json::json!([row]), language)?
+                .into_iter()
+                .next()
+            {
+                if seen.insert(album.id.clone()) {
+                    albums.push(album);
+                }
             }
         }
     }
@@ -841,46 +1135,136 @@ fn release_shelves(response: &Value) -> Result<(Vec<CatalogAlbum>, Vec<CatalogTr
 
 async fn discover_page_from(base: &str, languages: &[String]) -> Result<DiscoverPage, String> {
     let primary = languages.first().map(String::as_str).unwrap_or("english");
-    let releases = request(base, "content.getAlbums", &[("languages", languages.join(",")), ("n", "40".into())]).await;
+    let releases = request(
+        base,
+        "content.getAlbums",
+        &[("languages", languages.join(",")), ("n", "40".into())],
+    )
+    .await;
     // Homepage language selection is cookie-based; query parameters are ignored by this endpoint.
     let cookie = format!("L={}", urlencoding::encode(&languages.join(",")));
-    let trending = request_context_cookie(base, "webapi.getLaunchData", &[], "web6dot0", &cookie).await;
-    let charts = request_context_cookie(base, "content.getCharts", &[], "web6dot0", "L=hindi%2Ctamil%2Cmalayalam%2Ctelugu%2Cenglish%2Ckannada%2Cpunjabi%2Cbengali%2Cmarathi").await;
-    let mut result = DiscoverPage { new_albums: vec![], new_singles: vec![], trending: vec![], trending_items: vec![], charts: vec![], top_songs: vec![], chart_title: String::new(), warnings: vec![] };
+    let trending =
+        request_context_cookie(base, "webapi.getLaunchData", &[], "web6dot0", &cookie).await;
+    let charts = request_context_cookie(
+        base,
+        "content.getCharts",
+        &[],
+        "web6dot0",
+        "L=hindi%2Ctamil%2Cmalayalam%2Ctelugu%2Cenglish%2Ckannada%2Cpunjabi%2Cbengali%2Cmarathi",
+    )
+    .await;
+    let mut result = DiscoverPage {
+        new_albums: vec![],
+        new_singles: vec![],
+        trending: vec![],
+        trending_items: vec![],
+        charts: vec![],
+        top_songs: vec![],
+        chart_title: String::new(),
+        warnings: vec![],
+    };
     match releases.and_then(|value| release_shelves(&value)) {
-        Ok((albums, singles)) => { result.new_albums = albums; result.new_singles = singles; },
-        Err(_) => result.warnings.push("New releases couldn't load. Try refreshing.".into()),
+        Ok((albums, singles)) => {
+            result.new_albums = albums;
+            result.new_singles = singles;
+        }
+        Err(_) => result
+            .warnings
+            .push("New releases couldn't load. Try refreshing.".into()),
     }
-    if let Ok(ref rows) = trending { result.trending_items = homepage_trending(rows); }
+    if let Ok(ref rows) = trending {
+        result.trending_items = homepage_trending(rows);
+    }
     if result.trending_items.is_empty() {
-        result.warnings.push("JioSaavn's homepage trending couldn't load; showing song-only results if available.".into());
-        if let Ok(rows) = request(base, "content.getTrending", &[("entity_type", "song".into()), ("entity_language", primary.into())]).await {
-        let mut seen = HashSet::new();
-        result.trending = rows.as_array().into_iter().flatten().filter_map(track).filter(|song| original_trending_title(&song.title) && seen.insert(song.id.clone())).take(8).collect();
+        result.warnings.push(
+            "JioSaavn's homepage trending couldn't load; showing song-only results if available."
+                .into(),
+        );
+        if let Ok(rows) = request(
+            base,
+            "content.getTrending",
+            &[
+                ("entity_type", "song".into()),
+                ("entity_language", primary.into()),
+            ],
+        )
+        .await
+        {
+            let mut seen = HashSet::new();
+            result.trending = rows
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(track)
+                .filter(|song| original_trending_title(&song.title) && seen.insert(song.id.clone()))
+                .take(8)
+                .collect();
         }
     } else {
-        result.trending = result.trending_items.iter().filter_map(|item| match item { TrendingItem::Song(song) => Some(song.clone()), _ => None }).collect();
+        result.trending = result
+            .trending_items
+            .iter()
+            .filter_map(|item| match item {
+                TrendingItem::Song(song) => Some(song.clone()),
+                _ => None,
+            })
+            .collect();
     }
-    if result.trending_items.is_empty() && result.trending.is_empty() { result.warnings.push("Trending tracks are unavailable right now.".into()); }
-    let chart_rows = charts.as_ref().ok().filter(|rows| rows.as_array().is_some_and(|rows| !rows.is_empty()))
+    if result.trending_items.is_empty() && result.trending.is_empty() {
+        result
+            .warnings
+            .push("Trending tracks are unavailable right now.".into());
+    }
+    let chart_rows = charts
+        .as_ref()
+        .ok()
+        .filter(|rows| rows.as_array().is_some_and(|rows| !rows.is_empty()))
         .or_else(|| trending.as_ref().ok().and_then(|value| value.get("charts")));
     if let Some(charts) = chart_rows {
         result.charts = chart_summaries(charts);
         let rows = charts.as_array().map(Vec::as_slice).unwrap_or(&[]);
-        let chart = rows.iter().find(|row| name(&row["title"]).is_some_and(|title| title.to_lowercase().starts_with(primary)))
-            .or_else(|| rows.iter().find(|row| row["title"].as_str() == Some("India Superhits Top 50")));
+        let chart = rows
+            .iter()
+            .find(|row| {
+                name(&row["title"]).is_some_and(|title| title.to_lowercase().starts_with(primary))
+            })
+            .or_else(|| {
+                rows.iter()
+                    .find(|row| row["title"].as_str() == Some("India Superhits Top 50"))
+            });
         if let Some(chart) = chart {
             if let Some(id) = entity_id(&chart["id"]) {
-                if let Ok(details) = request(base, "playlist.getDetails", &[("listid", id), ("n", "10".into()), ("p", "1".into())]).await {
+                if let Ok(details) = request(
+                    base,
+                    "playlist.getDetails",
+                    &[("listid", id), ("n", "10".into()), ("p", "1".into())],
+                )
+                .await
+                {
                     result.chart_title = name(&chart["title"]).unwrap_or_default();
                     let mut seen = HashSet::new();
-                    result.top_songs = details["list"].as_array().into_iter().flatten().filter_map(track).filter(|song| seen.insert(song.id.clone())).take(10).collect();
+                    result.top_songs = details["list"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(track)
+                        .filter(|song| seen.insert(song.id.clone()))
+                        .take(10)
+                        .collect();
                 }
             }
         }
     }
-    if result.charts.is_empty() { result.warnings.push("JioSaavn charts couldn't load. Refresh Discover to retry.".into()); }
-    if result.top_songs.is_empty() { result.warnings.push("The top songs chart couldn't load. Try refreshing.".into()); }
+    if result.charts.is_empty() {
+        result
+            .warnings
+            .push("JioSaavn charts couldn't load. Refresh Discover to retry.".into());
+    }
+    if result.top_songs.is_empty() {
+        result
+            .warnings
+            .push("The top songs chart couldn't load. Try refreshing.".into());
+    }
     Ok(result)
 }
 
@@ -890,34 +1274,352 @@ pub struct ChartDetails {
     info: CatalogChart,
     tracks: Vec<CatalogTrack>,
     partial: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    warning: Option<String>,
 }
 
 async fn lookup_chart_from(base: &str, id: &str) -> Result<ChartDetails, String> {
-    let source = id.strip_prefix("saavn:chart:").filter(|value| value.parse::<u64>().ok().is_some_and(|id| id > 0 && id.to_string() == *value))
+    let source = id
+        .strip_prefix("saavn:chart:")
+        .filter(|value| {
+            value
+                .parse::<u64>()
+                .ok()
+                .is_some_and(|id| id > 0 && id.to_string() == *value)
+        })
         .ok_or("Invalid JioSaavn chart ID.")?;
-    let response = provider_http::optional_json(base, &[
-        ("__call", "playlist.getDetails".into()), ("_format", "json".into()), ("_marker", "0".into()),
-        ("api_version", "4".into()), ("ctx", "web6dot0".into()), ("listid", source.into()), ("n", "100".into()), ("p", "1".into()),
-    ]).await?;
-    let info = chart_summary(&response).filter(|chart| chart.id == id).ok_or("The provider returned a different or invalid chart.")?;
-    let rows = response["list"].as_array().ok_or("JioSaavn returned an invalid chart tracklist.")?;
+    let response = provider_http::optional_json(
+        base,
+        &[
+            ("__call", "playlist.getDetails".into()),
+            ("_format", "json".into()),
+            ("_marker", "0".into()),
+            ("api_version", "4".into()),
+            ("ctx", "web6dot0".into()),
+            ("listid", source.into()),
+            ("n", "100".into()),
+            ("p", "1".into()),
+        ],
+    )
+    .await?;
+    let info = chart_summary(&response)
+        .filter(|chart| chart.id == id)
+        .ok_or("The provider returned a different or invalid chart.")?;
+    let rows = response["list"]
+        .as_array()
+        .ok_or("JioSaavn returned an invalid chart tracklist.")?;
     let mut seen = HashSet::new();
-    let tracks: Vec<_> = rows.iter().take(100).filter_map(track).filter(|song| seen.insert(song.id.clone())).collect();
-    if tracks.is_empty() { return Err("This chart has no playable catalog tracks right now. Try another chart or retry later.".into()); }
-    let partial = tracks.len() < rows.len() || info.track_count.is_some_and(|count| count as usize > tracks.len());
-    Ok(ChartDetails { info, tracks, partial })
+    let tracks: Vec<_> = rows
+        .iter()
+        .take(100)
+        .filter_map(track)
+        .filter(|song| seen.insert(song.id.clone()))
+        .collect();
+    if tracks.is_empty() {
+        return Err("This chart has no playable catalog tracks right now. Try another chart or retry later.".into());
+    }
+    let partial = tracks.len() < rows.len()
+        || info
+            .track_count
+            .is_some_and(|count| count as usize > tracks.len());
+    Ok(ChartDetails {
+        info,
+        tracks,
+        partial,
+        warning: None,
+    })
 }
 
 #[tauri::command]
-pub async fn lookup_chart(id: String) -> Result<ChartDetails, String> { lookup_chart_from(BASE, &id).await }
+pub async fn lookup_chart(id: String) -> Result<ChartDetails, String> {
+    lookup_chart_from(BASE, &id).await
+}
 
 #[tauri::command]
 pub async fn discover_page(languages: Vec<String>) -> Result<DiscoverPage, String> {
-    let supported = ["english", "hindi", "tamil", "telugu", "malayalam", "kannada", "punjabi", "bengali", "marathi"];
-    if languages.is_empty() || languages.len() > supported.len() || languages.iter().any(|language| !supported.contains(&language.as_str())) {
+    let supported = [
+        "english",
+        "hindi",
+        "tamil",
+        "telugu",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bengali",
+        "marathi",
+    ];
+    if languages.is_empty()
+        || languages.len() > supported.len()
+        || languages
+            .iter()
+            .any(|language| !supported.contains(&language.as_str()))
+    {
         return Err("Choose supported discovery languages.".into());
     }
     discover_page_from(BASE, &languages).await
+}
+
+async fn search_mood_tracks(
+    base: &str,
+    mood: &str,
+    languages: &[String],
+) -> Result<Vec<CatalogTrack>, String> {
+    let (search_terms, genre_hints): (&[&str], &[&str]) = match mood.to_lowercase().as_str() {
+        "party" => (
+            &["party", "dance", "club", "upbeat"],
+            &["Dance", "Electronic", "Pop"],
+        ),
+        "chill" => (
+            &["chill", "relax", "calm", "acoustic"],
+            &["Acoustic", "Indie", "Ambient"],
+        ),
+        "focus" => (
+            &["instrumental", "lo-fi", "study", "ambient"],
+            &["Classical", "Instrumental", "Ambient"],
+        ),
+        "workout" => (
+            &["workout", "energy", "power", "gym"],
+            &["Rock", "Hip-Hop", "Electronic"],
+        ),
+        "romance" => (
+            &["romantic", "love", "ballad"],
+            &["Romantic", "Ballad", "Soul", "Pop", "Indie"],
+        ),
+        "sad" => (
+            &["sad", "melancholy", "emotional"],
+            &["Ballad", "Indie", "Soul"],
+        ),
+        "sleep" => (
+            &["sleep", "peaceful", "night", "calm"],
+            &["Classical", "Ambient", "Acoustic"],
+        ),
+        "energize" => (
+            &["energy", "upbeat", "motivational"],
+            &["Pop", "Rock", "Electronic"],
+        ),
+        "commute" => (&["travel", "journey", "drive"], &["Pop", "Rock", "Indie"]),
+        "gaming" => (
+            &["intense", "epic", "electronic"],
+            &["Electronic", "Rock", "Soundtrack"],
+        ),
+        "feel good" => (&["happy", "upbeat", "positive"], &["Pop", "Dance", "Indie"]),
+        _ => return Err(format!("Mood '{}' is not supported.", mood)),
+    };
+
+    let mut tracks_by_id = std::collections::HashMap::new();
+    let mut successful_searches = 0;
+    for language in languages {
+        for term in search_terms.iter() {
+            let query = format!("{term} {language}");
+            let tracks = match search_from(base, &query, 40).await {
+                Ok(tracks) => {
+                    successful_searches += 1;
+                    tracks
+                }
+                Err(_) => continue,
+            };
+            for track in tracks {
+                let language_matches = track
+                    .language
+                    .as_ref()
+                    .is_none_or(|actual| actual.eq_ignore_ascii_case(language));
+                let genre_matches = track.genre.as_ref().is_none_or(|actual| {
+                    genre_hints
+                        .iter()
+                        .any(|hint| actual.to_lowercase().contains(&hint.to_lowercase()))
+                });
+                if language_matches && genre_matches {
+                    tracks_by_id.entry(track.id.clone()).or_insert(track);
+                }
+            }
+            if tracks_by_id.len() >= 30 {
+                break;
+            }
+        }
+        if tracks_by_id.len() >= 30 {
+            break;
+        }
+    }
+
+    if successful_searches == 0 {
+        return Err(
+            "The music catalog couldn't load this mood collection. Retry in a moment.".into(),
+        );
+    }
+    let mut tracks: Vec<_> = tracks_by_id.into_values().collect();
+    tracks.sort_by(|a, b| b.play_count.unwrap_or(0).cmp(&a.play_count.unwrap_or(0)));
+    tracks.truncate(30);
+    Ok(tracks)
+}
+
+#[tauri::command]
+pub async fn search_mood_collection(
+    mood: String,
+    languages: Vec<String>,
+) -> Result<ChartDetails, String> {
+    let mood_trimmed = mood.trim();
+    if mood_trimmed.is_empty() || mood_trimmed.len() > 50 {
+        return Err("Invalid mood name.".into());
+    }
+
+    let supported = [
+        "english",
+        "hindi",
+        "tamil",
+        "telugu",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bengali",
+        "marathi",
+    ];
+    if languages.is_empty()
+        || languages.len() > supported.len()
+        || languages
+            .iter()
+            .any(|language| !supported.contains(&language.as_str()))
+    {
+        return Err("Choose supported languages.".into());
+    }
+
+    let tracks = search_mood_tracks(BASE, mood_trimmed, &languages).await?;
+
+    Ok(ChartDetails {
+        info: CatalogChart {
+            id: format!("lumaire:mood:{}", urlencoding::encode(mood_trimmed)),
+            title: format!("{} · Mood", mood_trimmed),
+            subtitle: "Curated by metadata and play count".into(),
+            artwork_url: None,
+            track_count: Some(tracks.len() as u32),
+        },
+        tracks,
+        partial: false,
+        warning: Some("Search-based mood discovery using JioSaavn metadata. Not all tracks may match the mood perfectly.".into()),
+    })
+}
+
+async fn search_genre_collection_from(
+    base: &str,
+    genre_trimmed: &str,
+    languages: &[String],
+) -> Result<ChartDetails, String> {
+    if genre_trimmed.is_empty() || genre_trimmed.len() > 50 {
+        return Err("Invalid genre name.".into());
+    }
+
+    let supported = [
+        "english",
+        "hindi",
+        "tamil",
+        "telugu",
+        "malayalam",
+        "kannada",
+        "punjabi",
+        "bengali",
+        "marathi",
+    ];
+    if languages.is_empty()
+        || languages.len() > supported.len()
+        || languages
+            .iter()
+            .any(|language| !supported.contains(&language.as_str()))
+    {
+        return Err("Choose supported languages.".into());
+    }
+
+    let genre_aliases: &[&str] = match genre_trimmed.to_lowercase().as_str() {
+        "pop" => &["pop", "popular"],
+        "rock" => &["rock"],
+        "hip hop" => &["hip hop", "hip-hop", "rap"],
+        "jazz" => &["jazz"],
+        "classical" => &["classical"],
+        "electronic" => &["electronic", "edm", "dance"],
+        "indie" => &["indie", "independent"],
+        "soul" => &["soul"],
+        "r&b" => &["r&b", "rnb", "rhythm and blues"],
+        "folk" => &["folk"],
+        "metal" => &["metal", "heavy metal"],
+        "blues" => &["blues"],
+        _ => return Err(format!("Genre '{}' is not supported.", genre_trimmed)),
+    };
+    let genre_key = genre_trimmed.to_lowercase();
+    let mut tracks_by_id = std::collections::HashMap::new();
+    let mut successful_searches = 0;
+    for language in languages {
+        let query = format!("{genre_trimmed} {language}");
+        let Ok(results) = search_from(base, &query, 60).await else {
+            continue;
+        };
+        successful_searches += 1;
+        for track in results {
+            let language_matches = track.language.as_ref().is_none_or(|actual| {
+                languages
+                    .iter()
+                    .any(|selected| actual.eq_ignore_ascii_case(selected))
+            });
+            let metadata_matches = track.genre.as_ref().is_some_and(|actual| {
+                let actual = actual.to_lowercase();
+                genre_aliases.iter().any(|alias| actual.contains(alias))
+            });
+            if language_matches && metadata_matches {
+                tracks_by_id.entry(track.id.clone()).or_insert(track);
+            }
+        }
+        if tracks_by_id.len() >= 50 {
+            break;
+        }
+    }
+    if successful_searches == 0 {
+        return Err(
+            "The music catalog couldn't load this genre collection. Retry in a moment.".into(),
+        );
+    }
+    let mut tracks: Vec<CatalogTrack> = tracks_by_id.into_values().collect();
+    tracks.sort_by(|a, b| {
+        let a_match = a
+            .genre
+            .as_deref()
+            .is_some_and(|value| value.to_lowercase().contains(&genre_key));
+        let b_match = b
+            .genre
+            .as_deref()
+            .is_some_and(|value| value.to_lowercase().contains(&genre_key));
+        b_match
+            .cmp(&a_match)
+            .then_with(|| b.play_count.unwrap_or(0).cmp(&a.play_count.unwrap_or(0)))
+    });
+    tracks.truncate(50);
+
+    Ok(ChartDetails {
+        info: CatalogChart {
+            id: format!("lumaire:genre:{}", urlencoding::encode(genre_trimmed)),
+            title: format!("{} · Genre", genre_trimmed),
+            subtitle: "Filtered by genre metadata".into(),
+            artwork_url: None,
+            track_count: Some(tracks.len() as u32),
+        },
+        tracks,
+        partial: false,
+        warning: Some(
+            "Genre-based filtering using JioSaavn metadata. Some tracks may not have genre tags."
+                .into(),
+        ),
+    })
+}
+
+#[tauri::command]
+pub async fn search_genre_collection(
+    genre: String,
+    languages: Vec<String>,
+) -> Result<ChartDetails, String> {
+    let genre = genre.trim();
+    search_genre_collection_from(BASE, genre, &languages).await
+}
+
+#[cfg(test)]
+mod collection_tests {
+    use super::*;
+    include!("catalog_collection_tests.rs");
 }
 
 #[cfg(test)]
@@ -926,29 +1628,82 @@ mod home_tests {
     #[test]
     #[ignore = "explicit public JioSaavn homepage comparison; requires network"]
     fn live_homepage_trending() {
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let page = runtime.block_on(discover_page_from(BASE, &["hindi".into(), "english".into(), "tamil".into()])).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let page = runtime
+            .block_on(discover_page_from(
+                BASE,
+                &["hindi".into(), "english".into(), "tamil".into()],
+            ))
+            .unwrap();
         assert!(!page.trending_items.is_empty());
         let rows = serde_json::to_value(&page.trending_items).unwrap();
-        let kinds: HashSet<_> = rows.as_array().unwrap().iter().filter_map(|row| row["kind"].as_str()).collect();
+        let kinds: HashSet<_> = rows
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|row| row["kind"].as_str())
+            .collect();
         assert!(kinds.contains("album") && kinds.contains("song") && !kinds.contains("playlist"));
         for row in rows.as_array().unwrap().iter().take(10) {
-            println!("{}: {}", row["kind"].as_str().unwrap(), row["item"]["title"].as_str().unwrap());
+            println!(
+                "{}: {}",
+                row["kind"].as_str().unwrap(),
+                row["item"]["title"].as_str().unwrap()
+            );
         }
-        println!("Homepage items: {}; compatible recommendation songs: {}", page.trending_items.len(), page.trending.len());
+        println!(
+            "Homepage items: {}; compatible recommendation songs: {}",
+            page.trending_items.len(),
+            page.trending.len()
+        );
     }
     #[test]
     #[ignore = "explicit regional JioSaavn chart coverage check; requires network"]
     fn live_jiosaavn_chart_coverage() {
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let page = runtime.block_on(discover_page_from(BASE, &["hindi".into(), "english".into(), "tamil".into()])).unwrap();
-        for prefix in ["hindi:", "tamil:", "malayalam:", "telugu:", "international", "india superhits"] {
-            let chart = page.charts.iter().find(|chart| chart.title.to_lowercase().starts_with(prefix)).expect("Requested regional chart must exist in this live comparison");
-            let details = runtime.block_on(lookup_chart_from(BASE, &chart.id)).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let page = runtime
+            .block_on(discover_page_from(
+                BASE,
+                &["hindi".into(), "english".into(), "tamil".into()],
+            ))
+            .unwrap();
+        for prefix in [
+            "hindi:",
+            "tamil:",
+            "malayalam:",
+            "telugu:",
+            "international",
+            "india superhits",
+        ] {
+            let chart = page
+                .charts
+                .iter()
+                .find(|chart| chart.title.to_lowercase().starts_with(prefix))
+                .expect("Requested regional chart must exist in this live comparison");
+            let details = runtime
+                .block_on(lookup_chart_from(BASE, &chart.id))
+                .unwrap();
             assert!(!details.tracks.is_empty());
-            println!("{} | {} | {} tracks | partial={} | artwork={} | first={}", chart.id, chart.title, details.tracks.len(), details.partial, chart.artwork_url.is_some(), details.tracks[0].title);
+            println!(
+                "{} | {} | {} tracks | partial={} | artwork={} | first={}",
+                chart.id,
+                chart.title,
+                details.tracks.len(),
+                details.partial,
+                chart.artwork_url.is_some(),
+                details.tracks[0].title
+            );
         }
-        assert!(page.trending_items.iter().all(|item| match item { TrendingItem::Song(song) => original_trending_title(&song.title), TrendingItem::Album(album) => original_trending_title(&album.title) }));
+        assert!(page.trending_items.iter().all(|item| match item {
+            TrendingItem::Song(song) => original_trending_title(&song.title),
+            TrendingItem::Album(album) => original_trending_title(&album.title),
+        }));
     }
     fn song_fixture(id: &str) -> Value {
         serde_json::json!({"id":id,"title":"New single","type":"song","language":"tamil","image":"https://c.saavncdn.com/cover.jpg","more_info":{"duration":"180","album_id":"42","album":"Release","artistMap":{"primary_artists":[{"id":"9","name":"Singer"}]}}})
@@ -968,17 +1723,32 @@ mod home_tests {
     fn homepage_trending_preserves_song_album_order_and_filters_playlists_and_variants() {
         let album = serde_json::json!({"id":"42","title":"Current album","type":"album","language":"tamil","more_info":{"release_date":"2026-10-23","artistMap":{"artists":[{"id":"9","name":"Singer"}]}}});
         let playlist = serde_json::json!({"id":"99","title":"Now Trending","subtitle":"66.7K Fans","type":"playlist","perma_url":"https://www.jiosaavn.com/featured/now-trending/BECHl0fsh08_"});
-        let rows = homepage_trending(&serde_json::json!({"new_trending":[album, song_fixture("abcdefgh"), playlist, album, {"type":"podcast"}, {"type":"song","id":"invalid"}]}));
+        let rows = homepage_trending(
+            &serde_json::json!({"new_trending":[album, song_fixture("abcdefgh"), playlist, album, {"type":"podcast"}, {"type":"song","id":"invalid"}]}),
+        );
         let serialized = serde_json::to_value(rows).unwrap();
         assert_eq!(serialized[0]["kind"], "album");
         assert_eq!(serialized[0]["item"]["artist"], "Singer");
         assert_eq!(serialized[1]["kind"], "song");
         assert_eq!(serialized.as_array().unwrap().len(), 2);
         assert!(homepage_trending(&serde_json::json!({"new_trending":[playlist]})).is_empty());
-        for title in ["Song (Remix)", "Song (Lo-fi Version)", "Song (Lo–fi Version)", "Song Slowed + Reverb", "Song Sped Up", "Song Mashup", "Song Nightcore"] {
-            let mut variant = song_fixture("abcdefgh"); variant["title"] = title.into();
-            let mut variant_album = album.clone(); variant_album["title"] = title.into();
-            assert!(homepage_trending(&serde_json::json!({"new_trending":[variant, variant_album]})).is_empty());
+        for title in [
+            "Song (Remix)",
+            "Song (Lo-fi Version)",
+            "Song (Lo–fi Version)",
+            "Song Slowed + Reverb",
+            "Song Sped Up",
+            "Song Mashup",
+            "Song Nightcore",
+        ] {
+            let mut variant = song_fixture("abcdefgh");
+            variant["title"] = title.into();
+            let mut variant_album = album.clone();
+            variant_album["title"] = title.into();
+            assert!(homepage_trending(
+                &serde_json::json!({"new_trending":[variant, variant_album]})
+            )
+            .is_empty());
         }
         assert!(homepage_trending(&serde_json::json!({"new_trending":{}})).is_empty());
     }
@@ -987,12 +1757,27 @@ mod home_tests {
         let song = song_fixture("abcdefgh");
         let (endpoint, server) = crate::provider_http::tests::server(vec![
             ("200 OK", serde_json::json!({"data":[song]}).to_string()),
-            ("200 OK", serde_json::json!({"new_trending":[song]}).to_string()),
-            ("200 OK", serde_json::json!([{"id":"99","title":"Tamil: Top 50","type":"playlist"}]).to_string()),
+            (
+                "200 OK",
+                serde_json::json!({"new_trending":[song]}).to_string(),
+            ),
+            (
+                "200 OK",
+                serde_json::json!([{"id":"99","title":"Tamil: Top 50","type":"playlist"}])
+                    .to_string(),
+            ),
             ("200 OK", serde_json::json!({"list":[song]}).to_string()),
         ]);
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let page = runtime.block_on(discover_page_from(&endpoint, &["tamil".into(), "english".into()])).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let page = runtime
+            .block_on(discover_page_from(
+                &endpoint,
+                &["tamil".into(), "english".into()],
+            ))
+            .unwrap();
         assert_eq!(page.new_singles.len(), 1);
         assert_eq!(page.trending.len(), 1);
         assert_eq!(page.trending_items.len(), 1);
@@ -1004,8 +1789,12 @@ mod home_tests {
         assert_eq!(requests.len(), 4);
         assert!(requests[0].contains("content.getAlbums"));
         assert!(requests[1].contains("webapi.getLaunchData"));
-        assert!(requests[1].to_lowercase().contains("cookie: l=tamil%2cenglish"));
-        assert!(requests[2].to_lowercase().contains("malayalam%2ctelugu%2cenglish"));
+        assert!(requests[1]
+            .to_lowercase()
+            .contains("cookie: l=tamil%2cenglish"));
+        assert!(requests[2]
+            .to_lowercase()
+            .contains("malayalam%2ctelugu%2cenglish"));
         assert!(requests[3].contains("listid=99"));
     }
     #[test]
@@ -1013,32 +1802,58 @@ mod home_tests {
         let song = song_fixture("abcdefgh");
         let (endpoint, server) = crate::provider_http::tests::server(vec![
             ("200 OK", serde_json::json!({"data":[song]}).to_string()),
-            ("200 OK", "{}".into()), ("200 OK", "[]".into()),
+            ("200 OK", "{}".into()),
+            ("200 OK", "[]".into()),
             ("200 OK", serde_json::json!([song]).to_string()),
         ]);
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let page = runtime.block_on(discover_page_from(&endpoint, &["tamil".into(), "english".into()])).unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let page = runtime
+            .block_on(discover_page_from(
+                &endpoint,
+                &["tamil".into(), "english".into()],
+            ))
+            .unwrap();
         assert_eq!(page.new_singles.len(), 1);
         assert_eq!(page.trending.len(), 1);
         assert!(page.trending_items.is_empty());
-        assert!(page.warnings.iter().any(|warning| warning.contains("song-only")));
+        assert!(page
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("song-only")));
         assert!(server.join().unwrap()[3].contains("content.getTrending"));
     }
     #[test]
     fn failed_discover_feeds_remain_partial_instead_of_blocking_browsing() {
-        let (endpoint, server) = crate::provider_http::tests::server(vec![("200 OK", "{}".into()), ("200 OK", "[]".into()), ("200 OK", "[]".into()), ("200 OK", "[]".into())]);
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let page = runtime.block_on(discover_page_from(&endpoint, &["english".into()])).unwrap();
+        let (endpoint, server) = crate::provider_http::tests::server(vec![
+            ("200 OK", "{}".into()),
+            ("200 OK", "[]".into()),
+            ("200 OK", "[]".into()),
+            ("200 OK", "[]".into()),
+        ]);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let page = runtime
+            .block_on(discover_page_from(&endpoint, &["english".into()]))
+            .unwrap();
         assert_eq!(page.warnings.len(), 5);
         assert!(page.top_songs.is_empty());
         assert_eq!(server.join().unwrap().len(), 4);
-        assert!(runtime.block_on(discover_page(vec!["unsupported".into()])).is_err());
+        assert!(runtime
+            .block_on(discover_page(vec!["unsupported".into()]))
+            .is_err());
     }
     #[test]
     fn home_feed_validates_language_identity_credits_and_duplicate_editions() {
         let row = serde_json::json!({"id":"42", "type":"album", "title":"A &amp; B", "language":"tamil", "image":"https://c.saavncdn.com/cover.jpg", "more_info":{"release_date":"2026-10-20", "artistMap":{"artists":[{"id":"9","name":"Composer"}]}}});
-        let mut duplicate = row.clone(); duplicate["id"] = "43".into();
-        let mut other_language = row.clone(); other_language["language"] = "hindi".into();
+        let mut duplicate = row.clone();
+        duplicate["id"] = "43".into();
+        let mut other_language = row.clone();
+        other_language["language"] = "hindi".into();
         let albums = home_albums(&serde_json::json!([row, duplicate, other_language, {"id":"oops"}, {"language":"tamil", "more_info":[]}]), "tamil").unwrap();
         assert_eq!(albums.len(), 1);
         assert_eq!(albums[0].id, "saavn:album:42");
@@ -1050,31 +1865,73 @@ mod home_tests {
     #[test]
     fn charts_preserve_provider_identity_order_artwork_and_deduplicate() {
         let row = serde_json::json!({"id":"99","type":"playlist","title":"Tamil: India Superhits Top 50","image":"https://c.saavncdn.com/chart.jpg","more_info":{"song_count":"50"}});
-        let mut duplicate_title = row.clone(); duplicate_title["id"] = "100".into();
-        let charts = chart_summaries(&serde_json::json!([row, row, duplicate_title, {"id":"101","type":"album","title":"Not a chart"}]));
+        let mut duplicate_title = row.clone();
+        duplicate_title["id"] = "100".into();
+        let charts = chart_summaries(
+            &serde_json::json!([row, row, duplicate_title, {"id":"101","type":"album","title":"Not a chart"}]),
+        );
         assert_eq!(charts.len(), 1);
         assert_eq!(charts[0].id, "saavn:chart:99");
         assert_eq!(charts[0].track_count, Some(50));
-        assert_eq!(charts[0].artwork_url.as_deref(), Some("https://c.saavncdn.com/chart.jpg"));
+        assert_eq!(
+            charts[0].artwork_url.as_deref(),
+            Some("https://c.saavncdn.com/chart.jpg")
+        );
     }
     #[test]
     fn chart_tracklists_validate_identity_keep_ranked_tracks_and_mark_partial_results() {
-        let mut remix = song_fixture("ijklmnop"); remix["title"] = "Song (Remix)".into();
+        let mut remix = song_fixture("ijklmnop");
+        remix["title"] = "Song (Remix)".into();
         let response = serde_json::json!({"id":"99","type":"playlist","title":"Malayalam: India Superhits Top 50","list_count":"50","list":[song_fixture("abcdefgh"),remix,song_fixture("abcdefgh"),{"id":"invalid","type":"song"}]});
-        let (base, server) = crate::provider_http::tests::server(vec![("200 OK", response.to_string())]);
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let chart = runtime.block_on(lookup_chart_from(&base, "saavn:chart:99")).unwrap();
-        assert_eq!(chart.tracks.iter().map(|track| track.id.as_str()).collect::<Vec<_>>(), ["saavn:abcdefgh", "saavn:ijklmnop"]);
+        let (base, server) =
+            crate::provider_http::tests::server(vec![("200 OK", response.to_string())]);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let chart = runtime
+            .block_on(lookup_chart_from(&base, "saavn:chart:99"))
+            .unwrap();
+        assert_eq!(
+            chart
+                .tracks
+                .iter()
+                .map(|track| track.id.as_str())
+                .collect::<Vec<_>>(),
+            ["saavn:abcdefgh", "saavn:ijklmnop"]
+        );
         assert!(chart.partial);
         let requests = server.join().unwrap();
         assert_eq!(requests.len(), 1);
-        assert!(requests[0].contains("playlist.getDetails") && requests[0].contains("listid=99") && requests[0].contains("n=100"));
-        for response in [serde_json::json!({"id":"100","type":"playlist","title":"Wrong chart","list":[song_fixture("abcdefgh")]}), serde_json::json!({"id":"99","type":"playlist","title":"Empty chart","list":[]})] {
-            let (base, server) = crate::provider_http::tests::server(vec![("200 OK", response.to_string())]);
-            assert!(runtime.block_on(lookup_chart_from(&base, "saavn:chart:99")).is_err()); server.join().unwrap();
+        assert!(
+            requests[0].contains("playlist.getDetails")
+                && requests[0].contains("listid=99")
+                && requests[0].contains("n=100")
+        );
+        for response in [
+            serde_json::json!({"id":"100","type":"playlist","title":"Wrong chart","list":[song_fixture("abcdefgh")]}),
+            serde_json::json!({"id":"99","type":"playlist","title":"Empty chart","list":[]}),
+        ] {
+            let (base, server) =
+                crate::provider_http::tests::server(vec![("200 OK", response.to_string())]);
+            assert!(runtime
+                .block_on(lookup_chart_from(&base, "saavn:chart:99"))
+                .is_err());
+            server.join().unwrap();
         }
-        for id in ["99", "saavn:chart:0", "saavn:chart:01", "saavn:chart:-1", "saavn:chart:18446744073709551616", "https://evil.test"] {
-            assert!(runtime.block_on(lookup_chart_from("http://127.0.0.1:1", id)).err().unwrap().contains("Invalid JioSaavn chart ID"));
+        for id in [
+            "99",
+            "saavn:chart:0",
+            "saavn:chart:01",
+            "saavn:chart:-1",
+            "saavn:chart:18446744073709551616",
+            "https://evil.test",
+        ] {
+            assert!(runtime
+                .block_on(lookup_chart_from("http://127.0.0.1:1", id))
+                .err()
+                .unwrap()
+                .contains("Invalid JioSaavn chart ID"));
         }
     }
     #[test]
@@ -1085,23 +1942,41 @@ mod home_tests {
             ("200 OK", serde_json::json!({"new_trending":[song],"charts":[{"id":"99","type":"playlist","title":"Tamil: Top 50"}]}).to_string()),
             ("200 OK", "[]".into()), ("200 OK", serde_json::json!({"list":[song]}).to_string()),
         ]);
-        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
-        let page = runtime.block_on(discover_page_from(&base, &["tamil".into()])).unwrap();
-        assert_eq!(page.charts.len(), 1); assert_eq!(page.top_songs.len(), 1);
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let page = runtime
+            .block_on(discover_page_from(&base, &["tamil".into()]))
+            .unwrap();
+        assert_eq!(page.charts.len(), 1);
+        assert_eq!(page.top_songs.len(), 1);
         assert_eq!(server.join().unwrap().len(), 4);
     }
 }
 
 #[tauri::command]
-pub async fn search_catalog_entities(query: String) -> Result<CatalogEntities, String> {
+pub async fn search_catalog_entities(app: tauri::AppHandle, query: String, request_id: Option<String>) -> Result<CatalogEntities, String> {
+    let original_query = query.clone();
     let query = query.trim();
     if !(1..=200).contains(&query.chars().count()) || query.chars().any(char::is_control) {
         return Err("Enter a catalog search between 1 and 200 characters.".into());
     }
-    crate::catalog_search::entities(query).await
+    let rows = crate::catalog_search::entities(query).await?;
+    let candidates = if rows.warning.is_none() { rows.artists.clone() } else { vec![] };
+    tauri::async_runtime::spawn(async move {
+        use tauri::Emitter;
+        for profile in crate::catalog_search::resolve_artists(&original_query, &candidates).await {
+            let _ = app.emit("artist-resolution", serde_json::json!({ "query": original_query, "requestId": request_id, "verifiedIds": profile.verified_ids, "artist": profile.info }));
+        }
+    });
+    Ok(rows)
 }
 
-pub(crate) async fn search_entities_from(base: &str, query: &str) -> Result<CatalogEntities, String> {
+pub(crate) async fn search_entities_from(
+    base: &str,
+    query: &str,
+) -> Result<CatalogEntities, String> {
     let params = [("q", query.into()), ("n", "6".into()), ("p", "1".into())];
     let artists = request(base, "search.getArtistResults", &params).await;
     let albums = request(base, "search.getAlbumResults", &params).await;
@@ -1128,15 +2003,7 @@ pub(crate) async fn search_entities_from(base: &str, query: &str) -> Result<Cata
         .unwrap_or_default()
         .iter()
         .filter_map(artist_summary)
-        .flat_map(|artist| {
-            let names = if same_name(&artist.name, query) { vec![artist.name.clone()] } else { artist_names(&artist.name) };
-            let single = names.len() == 1;
-            names.into_iter().filter(move |name| single || name.to_lowercase().contains(&query.to_lowercase()) || query.to_lowercase().contains(&name.to_lowercase())).map(move |name| CatalogArtist {
-                id: if single { artist.id.clone() } else { format!("saavn:artist:name:{}", urlencoding::encode(&name)) },
-                name, artwork_url: if single { artist.artwork_url.clone() } else { None },
-            })
-        })
-        .filter(|a| seen.insert(a.name.to_lowercase()))
+        .filter(|a| seen.insert(a.id.clone()))
         .take(6)
         .collect();
     let mut seen = HashSet::new();
@@ -1214,50 +2081,7 @@ pub(crate) async fn lookup_saavn_artist(base: &str, id: &str) -> Result<ArtistDe
     if !source.is_empty() && source.bytes().all(|byte| byte.is_ascii_digit()) {
         return Err("Invalid Saavn artist ID. Reopen the artist from Discover.".into());
     }
-    // Legacy links encoded names without a name: tag; numeric links remain provider IDs.
-    let artist_name = lookup_name(source.strip_prefix("name:").unwrap_or(source))?;
-    let artist_name = canonical_artist_lookup_name(&artist_name);
-    let tracks: Vec<_> = search_from(base, &artist_name, 30)
-        .await?
-        .into_iter()
-        .filter(|track| {
-            track
-                .artists
-                .iter()
-                .any(|credit| artist_names(&credit.name).iter().any(|name| same_name(name, &artist_name)))
-        })
-        .collect();
-    if tracks.is_empty() {
-        return Err(format!(
-            "No catalog tracks credit the artist '{artist_name}'."
-        ));
-    }
-    if let Some(source) = tracks
-        .iter()
-        .flat_map(|track| &track.artists)
-        .filter(|credit| same_name(&credit.name, &artist_name))
-        .filter_map(|credit| credit.id.as_deref()?.strip_prefix("saavn:artist:"))
-        .find_map(|source| entity_id(&Value::String(source.into())))
-    {
-        let response = request(
-            base,
-            "artist.getArtistPageDetails",
-            &[("artistId", source.clone())],
-        )
-        .await?;
-        return artist_details(&source, &response);
-    }
-    let albums = track_albums(&tracks, &artist_name);
-    Ok(ArtistDetails {
-        info: CatalogArtist {
-            id: format!("saavn:artist:name:{}", urlencoding::encode(&artist_name)),
-            name: artist_name,
-            artwork_url: None,
-        },
-        top_tracks: tracks.into_iter().take(10).collect(),
-        albums,
-        similar_artists: vec![],
-    })
+    Err("Artist identity is unresolved. Search and select a provider artist result.".into())
 }
 
 fn artist_details(source: &str, response: &Value) -> Result<ArtistDetails, String> {
@@ -1269,6 +2093,7 @@ fn artist_details(source: &str, response: &Value) -> Result<ArtistDetails, Strin
     let mut seen = HashSet::new();
     let top_tracks: Vec<_> = response["topSongs"]
         .as_array()
+        .or_else(|| response["topSongs"]["songs"].as_array())
         .into_iter()
         .flatten()
         .filter_map(track)
@@ -1279,13 +2104,19 @@ fn artist_details(source: &str, response: &Value) -> Result<ArtistDetails, Strin
                 .any(|credit| credit.id.as_deref() == Some(&id))
         })
         .filter(|track| seen.insert(track.id.clone()))
-        .take(10)
+        .take(100)
         .collect();
     let mut albums = track_albums(&top_tracks, &artist_name);
     let mut seen: HashSet<_> = albums.iter().map(|album| album.id.clone()).collect();
     for row in ["topAlbums", "singles", "latest_release"]
         .iter()
-        .flat_map(|key| response[key].as_array().into_iter().flatten())
+        .flat_map(|key| {
+            response[key]
+                .as_array()
+                .or_else(|| response[key]["albums"].as_array())
+                .into_iter()
+                .flatten()
+        })
     {
         let artists = credits(&row["more_info"]["artistMap"]);
         if !artists
@@ -1316,13 +2147,18 @@ fn artist_details(source: &str, response: &Value) -> Result<ArtistDetails, Strin
             }
         }
     }
+    if top_tracks.is_empty() && albums.is_empty() {
+        return Err("No credited music is available for this catalog artist.".into());
+    }
     Ok(ArtistDetails {
+        evidence: top_tracks.clone(),
+        verified_ids: vec![],
         info: CatalogArtist {
             id,
             name: artist_name,
             artwork_url: artwork(&response["image"]),
         },
-        top_tracks,
+        top_tracks: top_tracks.into_iter().take(10).collect(),
         albums,
         similar_artists: response["similarArtists"]
             .as_array()

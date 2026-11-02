@@ -110,13 +110,8 @@ export function LyricsView({
     ? (portalNode ?? (typeof document !== "undefined" ? document.getElementById("expanded-lyrics-settings-slot") : null))
     : null;
 
-  const isProgrammaticScroll = React.useRef(false);
-  const programmaticScrollTimer = React.useRef<number | null>(null);
-
   useEffect(() => {
     setFollow(true);
-    isProgrammaticScroll.current = true;
-    if (programmaticScrollTimer.current) window.clearTimeout(programmaticScrollTimer.current);
     if (!embedded) {
       document.getElementById("main")?.scrollTo({ top: 0, behavior: "instant" });
     } else {
@@ -127,32 +122,16 @@ export function LyricsView({
         container.scrollTo({ top: 0, behavior: "instant" });
       }
     }
-    programmaticScrollTimer.current = window.setTimeout(() => {
-      isProgrammaticScroll.current = false;
-    }, 450);
   }, [track?.id, setFollow, embedded]);
 
   useEffect(() => {
     if (follow && followTarget && activeRef.current) {
-      isProgrammaticScroll.current = true;
-      if (programmaticScrollTimer.current) window.clearTimeout(programmaticScrollTimer.current);
       centerLyricLine(
         activeRef.current,
         matchMedia("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth",
       );
-      programmaticScrollTimer.current = window.setTimeout(() => {
-        isProgrammaticScroll.current = false;
-      }, 450);
     }
   }, [followTarget, follow]);
-
-  useEffect(() => {
-    return () => {
-      if (programmaticScrollTimer.current) {
-        window.clearTimeout(programmaticScrollTimer.current);
-      }
-    };
-  }, []);
 
   useEffect(() => {
     const container = embedded
@@ -160,31 +139,29 @@ export function LyricsView({
       : document.getElementById("main");
     if (!container) return;
 
-    const handleScroll = () => {
-      if (isProgrammaticScroll.current) return;
-      if (follow) {
-        setFollow(false);
-      }
-    };
-
     const handleUserGesture = (e: Event) => {
       const target = e.target as HTMLElement | null;
       if (target?.closest?.(".lyric-room-floating-bar, .lyric-settings, .lyric-float-btn, button, .icon-button")) {
         return;
       }
-      isProgrammaticScroll.current = false;
       if (follow) {
         setFollow(false);
       }
     };
 
-    container.addEventListener("scroll", handleScroll, { passive: true });
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (event.defaultPrevented || target?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      if (["ArrowUp", "ArrowDown", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) handleUserGesture(event);
+    };
+    // Scroll events also come from smooth scrolling and layout anchoring; only input pauses follow.
+    container.addEventListener("keydown", handleKeyDown);
     container.addEventListener("wheel", handleUserGesture, { passive: true });
     container.addEventListener("touchmove", handleUserGesture, { passive: true });
     container.addEventListener("pointerdown", handleUserGesture, { passive: true });
 
     return () => {
-      container.removeEventListener("scroll", handleScroll);
+      container.removeEventListener("keydown", handleKeyDown);
       container.removeEventListener("wheel", handleUserGesture);
       container.removeEventListener("touchmove", handleUserGesture);
       container.removeEventListener("pointerdown", handleUserGesture);
@@ -305,6 +282,7 @@ export function LyricsView({
                   {" · "}
                   <ArtistLinks
                     artistString={track.artist}
+                    catalogId={track.metadataSourceId}
                     onNavigateArtist={onNavigateArtist}
                   />
                 </>
@@ -516,8 +494,10 @@ export function LyricsView({
                                       : undefined
                             }
                             dir="auto"
+                            spellCheck={layer.kind !== "roman"}
+                            style={layer.kind === "roman" ? { textDecorationLine: "none" } : undefined}
                           >
-                            {layer.kind === "original" && lyricSynced && lineActive && line.words?.length ? <WordLyrics line={line} clock={lyricClock} /> : layer.text}
+                            {(layer.kind === "original" || layer.kind === "roman") && lyricSynced && lineActive && line.words?.length ? <WordLyrics line={line} clock={lyricClock} text={layer.text} /> : layer.text}
                           </span>
                         ),
                       )}

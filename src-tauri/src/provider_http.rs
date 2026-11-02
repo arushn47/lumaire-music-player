@@ -103,27 +103,11 @@ pub(crate) mod tests {
         responses: Vec<(&'static str, String)>,
     ) -> (String, thread::JoinHandle<Vec<String>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        listener.set_nonblocking(true).unwrap();
         let url = format!("http://{}", listener.local_addr().unwrap());
         let handle = thread::spawn(move || {
             let mut requests = vec![];
             for (status, body) in responses {
-                let start = std::time::Instant::now();
-                let mut socket = loop {
-                    match listener.accept() {
-                        Ok((socket, _)) => break socket,
-                        Err(e)
-                            if e.kind() == std::io::ErrorKind::WouldBlock
-                                && start.elapsed() < Duration::from_secs(8) =>
-                        {
-                            thread::sleep(Duration::from_millis(10))
-                        }
-                        Err(e) => panic!("mock provider accept failed: {e}"),
-                    }
-                };
-                // Windows may inherit the listener's nonblocking mode. Reads
-                // below deliberately wait for a complete HTTP request header.
-                socket.set_nonblocking(false).unwrap();
+                let (mut socket, _) = listener.accept().expect("mock provider accept failed");
                 socket
                     .set_read_timeout(Some(Duration::from_secs(3)))
                     .unwrap();

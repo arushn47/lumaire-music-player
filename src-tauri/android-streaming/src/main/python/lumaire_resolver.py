@@ -1,4 +1,4 @@
-"""Bundled Android resolver. No downloads, credentials, cookies or remote code updates."""
+"""Android resolver with verified official engine updates; no credentials or cookies."""
 import collections
 import hashlib
 import json
@@ -50,9 +50,27 @@ def run(request_json, qjs, cache, wheels):
         def warning(self, message, **kwargs): logs.append(safe(message))
         def error(self, message, **kwargs): logs.append(safe(message))
     try:
-        for filename in sorted(os.listdir(wheels)):
-            if filename.endswith('.whl'):
-                sys.path.insert(0, os.path.join(wheels, filename))
+        import engine_updates
+        selected_wheels = engine_updates.select(wheels)
+        def load_engine(folder):
+            paths = [os.path.join(folder, name) for name in sorted(os.listdir(folder)) if name.endswith('.whl')]
+            sys.path[:0] = paths
+            import yt_dlp
+            import yt_dlp.version
+            import yt_dlp_ejs
+            from yt_dlp.extractor.youtube.jsc._builtin.quickjs import QuickJSJCP
+            return paths
+        try:
+            load_engine(selected_wheels)
+            engine_updates.activate(selected_wheels, wheels)
+        except Exception:
+            if selected_wheels == wheels:
+                raise
+            sys.path[:] = [p for p in sys.path if not p.startswith(selected_wheels + os.sep)]
+            for name in list(sys.modules):
+                if name == 'yt_dlp' or name.startswith('yt_dlp.') or name == 'yt_dlp_ejs' or name.startswith('yt_dlp_ejs.'):
+                    del sys.modules[name]
+            load_engine(wheels)
         os.environ['TMPDIR'] = cache
         tempfile.tempdir = cache
         import yt_dlp
@@ -61,8 +79,8 @@ def run(request_json, qjs, cache, wheels):
         diagnostic.update(ytDlp=yt_dlp.version.__version__, ejs=yt_dlp_ejs.version)
         options = {
             'format': AUDIO_FORMAT,
-            'skip_download': True, 'noplaylist': True, 'socket_timeout': 10,
-            'retries': 0, 'extractor_retries': 0, 'cachedir': False,
+            'skip_download': True, 'noplaylist': True, 'socket_timeout': 15,
+            'retries': 2, 'extractor_retries': 2, 'cachedir': False,
             'logger': Logger(), 'js_runtimes': {'quickjs': {'path': qjs}},
             'remote_components': set(),
         }

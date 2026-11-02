@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Heart, ListPlus, RefreshCw } from "lucide-react";
 import { Artwork, IconButton, Select } from "../common";
 import { EntityArtwork } from "../common/EntityArtwork";
+import { library } from "../../adapters/native";
 import { ArtistLinks } from "../common/ArtistLinks";
-import { albumReference, artistCredits, artistReference } from "../../domain/catalog-links";
+import { albumReference, artistCredits, resolveArtistCredit } from "../../domain/catalog-links";
 import {
   aggregateListening, formatListening, localDay, rangeStart,
   type HistoryRange, type ListeningRecord,
@@ -113,9 +114,9 @@ export function HistoryView({ initialTab = "stats", records, loading, error, mob
         <div className="listening-panels">{panels.map(panel => <section className="listening-ranking" key={panel.title} aria-label={panel.title}><h2>{panel.title}</h2><ol>{panel.rows.slice(0, 5).map((row, index) => <li key={row.key}>
           <span className="listening-rank-number">{index + 1}</span>{panel.kind === "track"
             ? <Artwork url={row.artworkUrl} className="listening-artwork" />
-            : <EntityArtwork kind={panel.kind as "artist" | "album"} name={row.title} artist={panel.kind === "album" ? row.subtitle : ""} trackTitle={row.record.title} artworkUrl={panel.kind === 'album' && !row.artworkUrl?.includes('ytimg.com') ? row.artworkUrl : undefined} />}
+            : <EntityArtwork kind={panel.kind as "artist" | "album"} name={row.title} artist={panel.kind === "album" ? row.subtitle : ""} trackTitle={row.record.title} catalogId={row.record.metadataSourceId} artworkUrl={panel.kind === 'album' && !row.artworkUrl?.includes('ytimg.com') ? row.artworkUrl : undefined} />}
           <div className="listening-rank-detail"><button type="button" disabled={(panel.kind === "album" && !albumReference(row.title, row.subtitle)) || (panel.kind === "artist" && !artistCredits(row.title).length)} onClick={() => {
-            if (panel.kind === "artist" && onNavigateArtist) onNavigateArtist(artistReference(row.title));
+            if (panel.kind === "artist" && onNavigateArtist) void resolveArtistCredit({ name: row.title }, row.record.metadataSourceId, library.lookupCatalog, library.lookupArtist).then(onNavigateArtist);
             else if (panel.kind === "album" && onNavigateAlbum) { const id = albumReference(row.title, row.subtitle); if (id) onNavigateAlbum(id); }
             else onReplay(row.record);
           }} title={row.title}>{row.title}</button>{panel.kind === "artist" ? <span title={row.subtitle}>{row.subtitle}</span> : <span title={row.subtitle}><ArtistLinks artistString={row.subtitle} onNavigateArtist={onNavigateArtist} /></span>}<div className="listening-time-bar" aria-hidden="true"><i style={{ width: `${Math.max(1, row.ms / Math.max(1, panel.rows[0]?.ms ?? 1) * 100)}%` }} /></div></div><div className="listening-rank-metrics"><span className="listening-duration">{formatListening(row.ms)}</span>{panel.kind === "track" && <span className="listening-plays">{row.plays} {row.plays === 1 ? "play" : "plays"}</span>}</div>
@@ -133,13 +134,13 @@ export function HistoryView({ initialTab = "stats", records, loading, error, mob
         </div>
         </> : <>
           <div className="listening-summary"><span><strong>{formatListening(stats.totalMs)}</strong> listened</span><span>{visible.length} qualified {visible.length === 1 ? "play" : "plays"}</span></div>
-          <div className="listening-days">{[...groups].map(([day, entries]) => <section key={day} aria-label={dayTitle(day, now)}><h2>{dayTitle(day, now)}</h2><ul>{entries.map(record => <li className="listening-history-row" key={record.id}>
+          <div className="listening-days">{[...groups].map(([day, entries]) => <section key={day} aria-label={dayTitle(day, now)}><h2>{dayTitle(day, now)}</h2><ul>{entries.map(record => <li className="listening-history-row" key={record.id} onClick={(e) => { if ((e.target as HTMLElement).closest("button, a, summary, details, input, .listening-history-actions")) return; onReplay(record); }}>
             <div className="listening-artwork-wrap" onClick={() => onReplay(record)} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onReplay(record); }} aria-label={`Play ${record.title}`}>
               <Artwork url={record.artworkUrl} className="listening-artwork" />
             </div>
             <div className="listening-history-identity">
               <button type="button" className="track-title-button" onClick={() => onReplay(record)} title={`Play ${record.title}`}>{record.title}</button>
-              <span title={record.artist}><ArtistLinks artistString={record.artist || "Unknown artist"} onNavigateArtist={onNavigateArtist} /></span>
+              <span title={record.artist}><ArtistLinks artistString={record.artist || "Unknown artist"} catalogId={record.metadataSourceId} onNavigateArtist={onNavigateArtist} /></span>
             </div>
             <div className="listening-history-meta">
               <span className="listening-history-duration">{formatListening(record.listenedMs)} listened</span>

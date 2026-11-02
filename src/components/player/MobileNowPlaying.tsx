@@ -12,8 +12,8 @@ import {
   Repeat,
   Repeat1,
   Heart,
-  ListPlus,
   X,
+  Ellipsis,
   Loader2,
   Volume2,
   VolumeX,
@@ -22,6 +22,8 @@ import { AmbientBackground } from "../common/AmbientBackground";
 import { Artwork } from "../common/Artwork";
 import { ArtistLinks } from "../common/ArtistLinks";
 import { DownloadedBadge } from "../common/DownloadedBadge";
+import { CloseTrackMenu } from '../common/CloseTrackMenu';
+import { TrackActionMenuItems } from "./PlayerBar";
 import { usePlayerSwipe } from "../../hooks/usePlayerSwipe";
 import type { Track, Session, Preferences, LyricDocument } from "../../domain/types";
 import type { Playback } from "../../player/controller";
@@ -29,11 +31,15 @@ import { playbackQueue } from "../../domain/queue";
 import "./mobile-now-playing.css";
 
 export interface MobileNowPlayingProps {
+  onWrongVersion?: () => void;
+  manageHistory?: boolean;
   initialTab?: "player" | "queue";
   track?: Track | null;
   tracks: Track[];
   session: Session;
   playback: Playback;
+  downloads?: Record<string, string>;
+  busy?: boolean;
   onClose: () => void;
   onTogglePlay: () => void;
   onSkip: (delta: 1 | -1) => void;
@@ -42,6 +48,10 @@ export interface MobileNowPlayingProps {
   onSetting: <K extends keyof Preferences>(key: K, value: Preferences[K]) => void;
   onNavigateArtist: (artistId: string) => void;
   onChoosePlaylist?: (track: Track) => void;
+  onDownloadTrack?: (track: Track) => void;
+  onDeleteOffline?: (track: Track) => void;
+  onSaveOnline?: (track: Track) => void;
+  onCancelDownload?: (trackId: string) => void;
   onSelectQueue: (entryId: string, play: boolean) => void;
   onReorderUpcoming: (entryId: string, delta: number) => void;
   onRemoveQueue: (entryId: string) => void;
@@ -60,11 +70,15 @@ const clock = (s: number) => {
 };
 
 export function MobileNowPlaying({
+  onWrongVersion,
+  manageHistory = true,
   initialTab = "player",
   track,
   tracks,
   session,
   playback,
+  downloads = {},
+  busy = false,
   onClose,
   onTogglePlay,
   onSkip,
@@ -73,6 +87,10 @@ export function MobileNowPlaying({
   onSetting,
   onNavigateArtist,
   onChoosePlaylist,
+  onDownloadTrack,
+  onDeleteOffline,
+  onSaveOnline,
+  onCancelDownload,
   onSelectQueue,
   onReorderUpcoming,
   onRemoveQueue,
@@ -104,22 +122,22 @@ export function MobileNowPlaying({
   // Handle hardware / gesture Android back button via History API
   useEffect(() => {
     const marker = Date.now();
-    window.history.pushState({ ...window.history.state, mobileNowPlaying: marker }, "");
+    if (manageHistory) window.history.pushState({ ...window.history.state, mobileNowPlaying: marker }, "");
     const onPopState = () => {
       handleDismiss();
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && !document.querySelector("dialog[open], details.track-menu[open]")) handleDismiss();
     };
-    window.addEventListener("popstate", onPopState);
+    if (manageHistory) window.addEventListener("popstate", onPopState);
     window.addEventListener("keydown", onKeyDown);
     return () => {
       clearTimeout(dismissTimer.current);
       window.removeEventListener("popstate", onPopState);
       window.removeEventListener("keydown", onKeyDown);
-      if (window.history.state?.mobileNowPlaying === marker) window.history.back();
+      if (manageHistory && window.history.state?.mobileNowPlaying === marker) window.history.back();
     };
-  }, [handleDismiss]);
+  }, [handleDismiss, manageHistory]);
 
   const swipes = usePlayerSwipe({
     up: () => setActiveTab("queue"),
@@ -204,15 +222,30 @@ export function MobileNowPlaying({
           <small>{track?.album || "Your music"}</small>
         </button>
 
-        <button
-          type="button"
-          className="mobile-np-icon-btn mobile-np-playlist-btn"
-          aria-label="Add to playlist"
-          title="Add to playlist"
-          onClick={() => track && onChoosePlaylist?.(track)}
-        >
-          <ListPlus size={22} />
-        </button>
+        {track ? (
+          <details className="track-menu">
+            <summary className="mobile-np-icon-btn" aria-label="Current song actions"><Ellipsis size={22}/></summary>
+            <div className="menu-popover">
+              <CloseTrackMenu />
+              <TrackActionMenuItems
+                onWrongVersion={onWrongVersion}
+                track={track}
+                tracks={tracks}
+                busy={busy}
+                session={session}
+                downloads={downloads}
+                onSaveOnline={onSaveOnline ?? (() => {})}
+                onChoosePlaylist={onChoosePlaylist ?? (() => {})}
+                onFavorite={onFavorite}
+                onCancelDownload={onCancelDownload ?? (() => {})}
+                onDownloadTrack={onDownloadTrack ?? (() => {})}
+                onDeleteOffline={onDeleteOffline ?? (() => {})}
+              />
+            </div>
+          </details>
+        ) : (
+          <div className="mobile-np-header-placeholder" />
+        )}
       </header>
 
       {/* View 1: Main Song / Player View */}
@@ -234,6 +267,7 @@ export function MobileNowPlaying({
               <div className="mobile-np-artist-line">
                 <DownloadedBadge track={track || undefined} />
                 <ArtistLinks
+                  catalogId={track?.metadataSourceId}
                   className="mobile-np-artist"
                   artistString={track?.artist || "Unknown artist"}
                   onNavigateArtist={(id) => {
@@ -245,19 +279,21 @@ export function MobileNowPlaying({
               </div>
             </div>
 
-            <button
-              type="button"
-              className={`mobile-np-fav-btn ${isFavorite ? "is-favorite" : ""}`}
-              aria-label={isFavorite ? "Remove favorite" : "Save to favorites"}
-              aria-pressed={isFavorite}
-              onClick={() => track && onFavorite(track.id)}
-            >
-              <Heart
-                size={24}
-                fill={isFavorite ? "var(--accent)" : "none"}
-                color={isFavorite ? "var(--accent)" : "currentColor"}
-              />
-            </button>
+            <div className="mobile-np-identity-actions">
+              <button
+                type="button"
+                className={`mobile-np-fav-btn ${isFavorite ? "is-favorite" : ""}`}
+                aria-label={isFavorite ? "Remove favorite" : "Save to favorites"}
+                aria-pressed={isFavorite}
+                onClick={() => track && onFavorite(track.id)}
+              >
+                <Heart
+                  size={24}
+                  fill={isFavorite ? "var(--accent)" : "none"}
+                  color={isFavorite ? "var(--accent)" : "currentColor"}
+                />
+              </button>
+            </div>
           </div>
 
           {/* Seek Bar Scrubber & Time */}
@@ -426,6 +462,7 @@ export function MobileNowPlaying({
                     <span className="mobile-np-now-playing-pill">Now playing</span>
                     {" · "}
                     <ArtistLinks
+                      catalogId={track.metadataSourceId}
                       artistString={track.artist}
                       onNavigateArtist={(id) => {
                         handleDismiss();
@@ -462,6 +499,7 @@ export function MobileNowPlaying({
                         <strong dir="auto">{itemTrack.title}</strong>
                         <small>
                           <ArtistLinks
+                            catalogId={itemTrack.metadataSourceId}
                             artistString={itemTrack.artist}
                             onNavigateArtist={(id) => {
                               handleDismiss();

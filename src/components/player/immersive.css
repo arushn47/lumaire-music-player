@@ -1,4 +1,4 @@
-.expanded-top-actions { display: flex; gap: 12px; align-items: center; pointer-events: auto; }
+.expanded-top-actions { display: flex; gap: 10px; align-items: center; pointer-events: auto; }
 dialog.expanded-player.is-immersive {
   background: var(--bg);
   color: var(--text);
@@ -20,6 +20,10 @@ dialog.expanded-player.is-immersive {
   background: linear-gradient(90deg, rgb(9 8 12 / 80%), rgb(9 8 12 / 46%) 65%, rgb(9 8 12 / 30%)),
     linear-gradient(0deg, rgb(9 8 12 / 95%), transparent 65%, rgb(9 8 12 / 28%));
 }
+.is-immersive:has(.no-lyrics)::after {
+  background: radial-gradient(circle at center, rgba(9, 8, 12, 0.42) 0%, rgba(9, 8, 12, 0.88) 100%),
+    linear-gradient(0deg, rgb(9 8 12 / 95%), transparent 65%, rgb(9 8 12 / 30%));
+}
 :root[data-theme="light"] .immersive-scene.is-cover {
   filter: blur(56px) saturate(0.82) brightness(0.97);
   transform: scale(1.18);
@@ -31,47 +35,265 @@ dialog.expanded-player.is-immersive {
     linear-gradient(90deg, rgba(248, 247, 242, 0.82) 0%, rgba(248, 247, 242, 0.68) 50%, rgba(248, 247, 242, 0.62) 100%),
     linear-gradient(0deg, rgba(248, 247, 242, 0.88) 0%, rgba(248, 247, 242, 0.45) 60%, rgba(248, 247, 242, 0.70) 100%);
 }
-.is-immersive .expanded-layout.has-lyrics,
-.is-immersive .expanded-layout.no-lyrics {
-  grid-template-columns: minmax(240px, 30%) minmax(0, 1fr);
-  gap: clamp(28px, 5vw, 100px); padding: 88px 5vw 204px;
+:root[data-theme="light"] .is-immersive:has(.no-lyrics)::after {
+  background:
+    radial-gradient(circle at center, rgba(248, 247, 242, 0.45) 0%, rgba(248, 247, 242, 0.86) 100%),
+    linear-gradient(0deg, rgba(248, 247, 242, 0.92) 0%, rgba(248, 247, 242, 0.48) 60%, rgba(248, 247, 242, 0.72) 100%);
+}
+.is-immersive .expanded-layout.has-lyrics {
+  grid-template-columns: minmax(320px, 38%) minmax(0, 1fr);
+  gap: clamp(24px, 3.5vw, 56px);
+  padding: calc(72px + env(safe-area-inset-top, 0px)) clamp(70px, 6.5vw, 105px) calc(128px + env(safe-area-inset-bottom, 0px)) clamp(48px, 8.5vw, 140px);
   align-items: center; justify-items: stretch; transition: none;
+  height: 100%;
+  box-sizing: border-box;
 }
-.is-immersive .expanded-layout .expanded-record { max-width: none; margin: 0; align-self: center; }
-.is-immersive .expanded-layout.no-lyrics .expanded-record { align-self: end; }
-.is-immersive .expanded-cover-wrapper {
-  width: min(100%, 29vh, 340px); margin: 0 0 28px; transform: none;
+.is-immersive .expanded-layout.has-lyrics .expanded-record {
+  width: 100%; max-width: 480px; margin: 0; align-self: center;
+  display: flex; flex-direction: column; justify-content: center;
 }
+.is-immersive .expanded-layout.has-lyrics .expanded-cover-wrapper {
+  width: min(100%, clamp(220px, 32vh, 368px)); margin: 0 0 18px; transform: none;
+}
+
+/* Centered showcase composition when lyrics are unavailable or hidden */
+.is-immersive .expanded-layout.no-lyrics {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  grid-template-columns: none !important;
+  width: 100%;
+  height: 100% !important;
+  max-width: 900px;
+  margin: 0 auto;
+  box-sizing: border-box !important;
+  padding: calc(72px + env(safe-area-inset-top, 0px)) 24px calc(128px + env(safe-area-inset-bottom, 0px)) !important;
+  transition: all 0.35s ease-out;
+}
+.is-immersive .expanded-layout.no-lyrics .expanded-record {
+  width: 100% !important;
+  max-width: min(92vw, 760px) !important;
+  margin: auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+.is-immersive .expanded-layout.no-lyrics .expanded-cover-wrapper {
+  width: min(88vw, clamp(290px, 50vh, 520px)) !important;
+  max-width: 520px !important;
+  aspect-ratio: 1 !important;
+  margin: 0 auto 24px !important;
+  border-radius: 20px !important;
+  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.55), 0 0 40px rgba(0, 0, 0, 0.3);
+}
+.is-immersive .expanded-layout.no-lyrics .expanded-cover {
+  border-radius: 20px !important;
+}
+.is-immersive .expanded-layout.no-lyrics .now-playing {
+  width: 100% !important;
+  max-width: min(92vw, 760px) !important;
+  justify-content: center !important;
+  text-align: center !important;
+  margin: 0 auto !important;
+  gap: 6px !important;
+}
+.is-immersive .expanded-layout.no-lyrics .track-meta.now-playing-meta {
+  width: 100% !important;
+  max-width: 100% !important;
+  align-items: center !important;
+  text-align: center !important;
+  gap: 6px !important;
+  padding-bottom: 0 !important;
+  margin-bottom: 0 !important;
+}
+.is-immersive .expanded-layout.no-lyrics .now-playing-title-wrap {
+  width: 100% !important;
+  max-width: 100% !important;
+  text-align: center !important;
+  display: block !important;
+  position: relative !important;
+}
+.is-immersive .expanded-layout.no-lyrics .now-playing-title-wrap strong {
+  font-size: clamp(22px, 2.2vw, 32px) !important;
+  line-height: 1.25 !important;
+  letter-spacing: -0.025em !important;
+  font-weight: 700 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  text-wrap: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  color: var(--text) !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+.is-immersive .expanded-layout.no-lyrics .track-subtitle-row {
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden !important;
+}
+.is-immersive .expanded-layout.no-lyrics .now-playing-artist {
+  font-size: clamp(14px, 1.25vw, 18px) !important;
+  text-align: center !important;
+  color: var(--text-secondary) !important;
+  max-width: min(90vw, 680px) !important;
+  margin: 0 auto !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: block !important;
+}
+.expanded-track-menu {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+}
+.expanded-track-menu summary.expanded-action-btn {
+  list-style: none !important;
+  cursor: pointer !important;
+}
+.expanded-track-menu summary.expanded-action-btn::-webkit-details-marker {
+  display: none !important;
+}
+.expanded-track-menu .menu-popover {
+  bottom: calc(100% + 12px) !important;
+  top: auto !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: none !important;
+  transform-origin: bottom right !important;
+  animation: popover-appear var(--duration-fast) var(--ease-spring) !important;
+  z-index: 100 !important;
+}
+.is-immersive .current-track-menu .menu-popover {
+  top: calc(100% + 8px) !important;
+  bottom: auto !important;
+  left: 0 !important;
+  right: auto !important;
+  transform: none !important;
+  transform-origin: top left !important;
+  animation: popover-appear var(--duration-fast) var(--ease-spring) !important;
+}
+.is-immersive .expanded-layout.no-lyrics .current-track-menu .menu-popover {
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%) !important;
+  transform-origin: top center !important;
+}
+
 .is-immersive .expanded-cover { border-radius: 14px; box-shadow: 0 20px 70px rgb(0 0 0 / 35%); }
 .is-immersive .expanded-transport { gap: 0; }
-.is-immersive.expanded-player .now-playing { gap: 8px; flex-wrap: wrap; justify-content: flex-start; }
-.is-immersive.expanded-player .track-meta.now-playing-meta { flex: 0 0 100%; gap: 12px; padding-bottom: 12px; }
+.is-immersive.expanded-player .now-playing { gap: 6px; flex-wrap: wrap; justify-content: flex-start; }
+.is-immersive.expanded-player .track-meta.now-playing-meta { flex: 0 0 100%; gap: 6px; padding-bottom: 0px; margin-bottom: 2px; }
+.is-immersive.expanded-player .now-playing-title-wrap { width: 100%; max-width: 100%; position: relative; }
 .is-immersive.expanded-player .now-playing-title-wrap strong {
-  font-size: clamp(28px, 3vw, 56px) !important; line-height: 1.1;
-  white-space: normal !important; overflow-wrap: anywhere; color: var(--text) !important;
-  display: -webkit-box !important; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-  letter-spacing: -.035em;
+  font-size: clamp(22px, 2.2vw, 32px) !important;
+  line-height: 1.25 !important;
+  font-weight: 700 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-wrap: nowrap !important;
+  word-break: normal !important;
+  overflow-wrap: normal !important;
+  color: var(--text) !important;
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  -webkit-box-orient: unset !important;
+  letter-spacing: -0.025em;
+  width: 100% !important;
+  max-width: 100% !important;
 }
-.is-immersive.expanded-player .now-playing-artist { font-size: clamp(15px, 1.3vw, 22px) !important; color: var(--text-secondary) !important; }
+.is-immersive.expanded-player .track-subtitle-row {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+.is-immersive.expanded-player .now-playing-artist {
+  font-size: clamp(14px, 1.2vw, 18px) !important;
+  color: var(--text-secondary) !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
 .is-immersive.expanded-player .now-playing-artist .link-button { font: inherit; color: inherit; }
-.is-immersive .expanded-transport .seek-bar-top {
-  position: absolute; top: auto; left: 5vw; bottom: 152px; width: 90vw; height: 24px; z-index: 10;
+
+/* Title hover tooltip in Immersive player */
+.is-immersive .title-hover-tooltip {
+  max-width: min(85vw, 420px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+  padding: 6px 12px;
+  border-radius: 8px;
+  background: var(--bg-popover, #242027);
+  border: 1px solid var(--line-strong, rgba(255, 255, 255, 0.15));
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  z-index: 120;
+  pointer-events: none;
 }
-.is-immersive .expanded-times { position: absolute; left: 5vw; bottom: 140px; width: 90vw; margin: 0; color: var(--text-secondary) !important; font-size: 12px; }
+:root[data-theme="light"] .is-immersive .title-hover-tooltip {
+  background: rgba(255, 255, 255, 0.96) !important;
+  color: #171717 !important;
+  border: 1px solid rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+}
+.is-immersive .expanded-layout.has-lyrics .title-hover-tooltip {
+  left: 0;
+  right: auto;
+  bottom: calc(100% + 8px);
+  transform: translateY(4px);
+  text-align: left;
+}
+.is-immersive .expanded-layout.has-lyrics .now-playing-title-wrap:hover .title-hover-tooltip {
+  transform: translateY(0);
+}
+.is-immersive .expanded-layout.no-lyrics .title-hover-tooltip {
+  left: 50%;
+  right: auto;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%) translateY(4px);
+  text-align: center;
+}
+.is-immersive .expanded-layout.no-lyrics .now-playing-title-wrap:hover .title-hover-tooltip {
+  transform: translateX(-50%) translateY(0);
+}
+.is-immersive .expanded-transport .seek-bar-top {
+  position: absolute; top: auto; left: 50%; transform: translateX(-50%); width: min(800px, calc(100vw - 2 * clamp(24px, 2.5vw, 36px))); bottom: calc(98px + env(safe-area-inset-bottom, 0px)); height: 24px; z-index: 10;
+}
+.is-immersive .expanded-times { position: absolute; left: 50%; transform: translateX(-50%); width: min(800px, calc(100vw - 2 * clamp(24px, 2.5vw, 36px))); bottom: calc(86px + env(safe-area-inset-bottom, 0px)); margin: 0; color: var(--text-secondary) !important; font-size: 12px; }
 .is-immersive .expanded-transport .player-center {
-  position: absolute; top: auto; left: 50%; bottom: 48px; width: 360px; max-width: 48vw; transform: translateX(-50%); margin: 0;
+  position: absolute; top: auto; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); width: 340px; max-width: 48vw; transform: translateX(-50%); margin: 0;
 }
 .is-immersive .expanded-transport .player-buttons { width: 100%; gap: 12px; }
 .is-immersive .expanded-transport .player-buttons .icon-button { width: 44px; height: 44px; color: var(--text-secondary) !important; }
 .is-immersive .expanded-transport .player-buttons .icon-button.active { color: var(--accent) !important; }
 :root[data-theme="light"] .is-immersive .expanded-transport .player-buttons .icon-button.active { background: rgba(var(--accent-rgb), 0.12) !important; }
-.is-immersive .expanded-transport .play-button { width: 68px; height: 68px; }
-.is-immersive .expanded-bottom-left { left: clamp(24px, 2.5vw, 36px); bottom: 38px; }
-.is-immersive .expanded-bottom-right { right: clamp(24px, 2.5vw, 36px); bottom: 38px; }
+.is-immersive .expanded-transport .play-button { width: 58px; height: 58px; }
+.is-immersive .expanded-bottom-left { left: clamp(24px, 2.5vw, 36px); bottom: 24px; }
+.is-immersive .expanded-bottom-right { right: clamp(24px, 2.5vw, 36px); bottom: 24px; }
 .is-immersive .expanded-bottom-left .expanded-lyrics-toggle,
 .is-immersive .expanded-bottom-right .expanded-action-btn {
-  width: 38px !important; height: 38px !important;
-  min-width: 38px !important; min-height: 38px !important;
+  width: 36px !important; height: 36px !important;
+  min-width: 36px !important; min-height: 36px !important;
 }
 
 /* Immersive Mode Lyrics: keep exact same UI, typography, and spacing as Minimal Mode / Lyric Room */
@@ -85,7 +307,10 @@ dialog.expanded-player.is-immersive {
   scrollbar-width: none;
   -ms-overflow-style: none;
   height: 100%;
-  max-height: min(100%, 54dvh);
+  max-height: min(100%, 65dvh);
+  max-width: min(710px, 100%);
+  margin-right: auto;
+  margin-left: 0;
   align-self: center;
   background: transparent !important;
   border: none !important;
@@ -100,23 +325,102 @@ dialog.expanded-player.is-immersive {
   background: transparent !important;
   scrollbar-width: none;
   -ms-overflow-style: none;
+  text-align: left;
 }
 .is-immersive .expanded-lyrics .lyric-room::-webkit-scrollbar { display: none; }
 .is-immersive .expanded-lyrics .lyric-room-heading,
 .is-immersive .expanded-lyrics .lyric-room-floating-bar { display: none; }
 .is-immersive .expanded-lyrics .lyric-lines {
   width: 100%;
-  max-width: min(860px, 100%);
+  max-width: min(710px, 100%);
   padding-top: 24vh;
   padding-bottom: 26vh;
   mask-image: none;
   -webkit-mask-image: none;
+  text-align: left;
+  margin-right: auto;
+  margin-left: 0;
 }
 .is-immersive .expanded-lyrics .lyric-line {
   width: 100%;
-  max-width: min(860px, 100%);
+  max-width: min(710px, 100%);
+  text-align: left !important;
+  justify-content: flex-start !important;
+  white-space: normal !important;
+  overflow-wrap: break-word !important;
 }
 .is-immersive :focus-visible { outline: 2px solid var(--accent) !important; outline-offset: 4px; }
+
+/* Enhanced inactive lyrics contrast in Immersive player while preserving active line dominance */
+.is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="0"],
+.is-immersive .lyric-lines[data-has-active="true"] .lyric-line.is-active {
+  opacity: 1 !important;
+  filter: blur(0px) !important;
+  transform: scale(1.035) !important;
+}
+.is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="1"] {
+  opacity: 0.68 !important;
+  filter: blur(0.3px) !important;
+  transform: scale(0.985) !important;
+}
+.is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="2"] {
+  opacity: 0.48 !important;
+  filter: blur(0.6px) !important;
+  transform: scale(0.965) !important;
+}
+.is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="3"] {
+  opacity: 0.32 !important;
+  filter: blur(1px) !important;
+  transform: scale(0.95) !important;
+}
+.is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="4"] {
+  opacity: 0.20 !important;
+  filter: blur(1.4px) !important;
+  transform: scale(0.93) !important;
+}
+.is-immersive .lyric-lines[data-has-active="true"] .lyric-line:hover:not(:disabled):not(.is-active) {
+  opacity: 0.85 !important;
+  filter: blur(0px) !important;
+}
+.is-immersive .lyric-translation:not(.lyric-primary) {
+  opacity: 0.82;
+}
+.is-immersive .lyric-line.is-active .lyric-translation:not(.lyric-primary) {
+  opacity: 1;
+}
+:root[data-theme="light"] .is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="1"] {
+  opacity: 0.72 !important;
+}
+:root[data-theme="light"] .is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="2"] {
+  opacity: 0.52 !important;
+}
+:root[data-theme="light"] .is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="3"] {
+  opacity: 0.36 !important;
+}
+:root[data-theme="light"] .is-immersive .lyric-lines[data-has-active="true"] .lyric-line[data-distance="4"] {
+  opacity: 0.24 !important;
+}
+
+/* Consistent dimensions and alignment for top action controls */
+.is-immersive .expanded-close,
+.is-immersive #expanded-lyrics-settings-slot .lyric-settings-trigger {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  box-sizing: border-box !important;
+  border-radius: 50% !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.is-immersive .expanded-close svg,
+.is-immersive #expanded-lyrics-settings-slot .lyric-settings-trigger svg {
+  width: 17px !important;
+  height: 17px !important;
+}
+
 
 /* Apple-style clean controls in Light Mode */
 :root[data-theme="light"] .is-immersive .expanded-close,
@@ -159,6 +463,12 @@ dialog.expanded-player.is-immersive {
   background: rgba(255, 255, 255, 0.88) !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06), 0 0 12px var(--accent-glow) !important;
 }
+:root[data-theme="light"] .is-immersive #expanded-lyrics-settings-slot .lyric-settings-trigger[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.95) !important;
+  border-color: rgba(var(--accent-rgb), 0.4) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.1), 0 0 10px var(--accent-glow) !important;
+  color: var(--accent) !important;
+}
 
 /* Apple-style clean controls in Dark Mode */
 :root:not([data-theme="light"]) .is-immersive .expanded-close,
@@ -198,14 +508,20 @@ dialog.expanded-player.is-immersive {
   border-color: rgba(var(--accent-rgb), 0.45) !important;
   background: rgba(255, 255, 255, 0.14) !important;
 }
+:root:not([data-theme="light"]) .is-immersive #expanded-lyrics-settings-slot .lyric-settings-trigger[aria-expanded="true"] {
+  background: rgba(255, 255, 255, 0.20) !important;
+  border-color: rgba(var(--accent-rgb), 0.5) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35), 0 0 12px var(--accent-glow) !important;
+  color: var(--accent) !important;
+}
 
 /* Volume Capsule: Apple Control Center fluid spring expansion & airtight overflow clipping */
 .is-immersive .expanded-volume-control {
-  width: 38px !important;
-  min-width: 38px !important;
-  max-width: 38px !important;
-  height: 38px !important;
-  min-height: 38px !important;
+  width: 36px !important;
+  min-width: 36px !important;
+  max-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
   border-radius: 9999px !important;
   padding: 0 !important;
   overflow: hidden !important;
@@ -331,68 +647,64 @@ dialog.expanded-player.is-immersive {
 
 @keyframes immersive-arrive { from { opacity: 0; } to { opacity: 1; } }
 @media (max-height: 760px) {
-  .is-immersive .expanded-layout.has-lyrics, .is-immersive .expanded-layout.no-lyrics { padding-top: 72px; padding-bottom: 190px; }
-  .is-immersive .expanded-cover-wrapper { width: min(100%, 24vh); margin-bottom: 18px; }
-  .is-immersive.expanded-player .now-playing-title-wrap strong { font-size: clamp(24px, 2.5vw, 38px) !important; -webkit-line-clamp: 2; }
+  .is-immersive .expanded-layout.has-lyrics { padding-top: max(68px, env(safe-area-inset-top, 0px)); padding-bottom: max(96px, env(safe-area-inset-bottom, 0px)); }
+  .is-immersive .expanded-layout.no-lyrics { padding-top: max(56px, env(safe-area-inset-top, 0px)); padding-bottom: max(96px, env(safe-area-inset-bottom, 0px)); }
+  .is-immersive .expanded-layout.has-lyrics .expanded-cover-wrapper { width: min(100%, 27vh); margin-bottom: 12px; }
+  .is-immersive .expanded-layout.no-lyrics .expanded-cover-wrapper { width: min(100%, 38vh); margin-bottom: 16px; }
+  .is-immersive.expanded-player .now-playing-title-wrap strong,
+  .is-immersive .expanded-layout.no-lyrics .now-playing-title-wrap strong {
+    font-size: clamp(18px, 2vw, 26px) !important;
+    -webkit-line-clamp: unset !important;
+    white-space: nowrap !important;
+  }
 }
 @media (max-width: 1100px) {
-  .is-immersive .expanded-layout.has-lyrics { grid-template-columns: minmax(220px, 32%) minmax(0, 1fr); gap: 28px; }
+  .is-immersive .expanded-layout.has-lyrics {
+    grid-template-columns: minmax(280px, 40%) minmax(0, 1fr);
+    gap: 28px;
+    padding-right: max(40px, env(safe-area-inset-right, 0px));
+  }
   .is-immersive .expanded-transport .player-center { width: 300px; }
 }
 @media (prefers-reduced-motion: reduce) { .immersive-scene { animation: none; } }
 
-.expanded-top-actions .fullscreen-layout-select .apple-select-trigger {
-  min-height: 36px; padding: 6px 12px; border-radius: 8px; gap: 12px;
-  border: 1px solid var(--line, rgba(255, 255, 255, 0.18));
-  background: var(--bg-panel, rgba(24, 22, 28, 0.75));
-  color: var(--text, #fff);
-  backdrop-filter: blur(16px); font-size: 13px;
-  transition: all 0.2s ease;
+@media (hover: hover) and (pointer: fine) {
+  .is-immersive :is(.seek-bar-top, .expanded-times, .expanded-transport .player-center, .expanded-top-bar, .expanded-bottom-left, .expanded-bottom-right) {
+    transition: opacity 250ms ease;
+  }
+  .is-immersive.is-progress-idle:not(:has(
+    .seek-bar-top:hover,
+    .expanded-times:hover,
+    .player-center:hover,
+    .seek-bar-top:focus-within,
+    .player-center:focus-within,
+    :focus-visible,
+    [open]
+  )) :is(.seek-bar-top, .expanded-times, .expanded-transport .player-center) {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .is-immersive.is-progress-idle:not(:has(
+    .expanded-top-bar:hover,
+    .expanded-bottom-left:hover,
+    .expanded-bottom-right:hover,
+    .expanded-top-bar:focus-within,
+    .expanded-bottom-left:focus-within,
+    .expanded-bottom-right:focus-within,
+    :focus-visible,
+    [open]
+  )) :is(.expanded-top-bar, .expanded-bottom-left, .expanded-bottom-right) {
+    opacity: 0.35;
+    pointer-events: auto;
+  }
+  .is-immersive.is-progress-idle :is(.expanded-top-bar, .expanded-bottom-left, .expanded-bottom-right):hover,
+  .is-immersive.is-progress-idle :is(.expanded-top-bar, .expanded-bottom-left, .expanded-bottom-right):focus-within {
+    opacity: 1;
+  }
 }
-:root[data-theme="light"] .expanded-top-actions .fullscreen-layout-select .apple-select-trigger {
-  background: rgba(255, 255, 255, 0.65) !important;
-  backdrop-filter: blur(20px) !important;
-  -webkit-backdrop-filter: blur(20px) !important;
-  border: 1px solid rgba(0, 0, 0, 0.08) !important;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.8) !important;
-  color: #171717 !important;
+@media (prefers-reduced-motion: reduce) {
+  .is-immersive :is(.seek-bar-top, .expanded-times, .expanded-transport .player-center, .expanded-top-bar, .expanded-bottom-left, .expanded-bottom-right) {
+    transition: none;
+  }
 }
-:root[data-theme="light"] .expanded-top-actions .fullscreen-layout-select .apple-select-trigger:hover {
-  background: rgba(255, 255, 255, 0.90) !important;
-  border-color: rgba(0, 0, 0, 0.14) !important;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
-}
-.expanded-top-actions .fullscreen-layout-select .apple-select-menu {
-  min-width: 160px; right: 0; left: auto; padding: 4px; border-radius: 10px;
-  background: var(--bg-popover, #242027);
-  border: 1px solid var(--line-strong, rgba(255, 255, 255, 0.14));
-  box-shadow: var(--shadow-popover, 0 16px 40px rgba(0, 0, 0, 0.4));
-}
-:root[data-theme="light"] .expanded-top-actions .fullscreen-layout-select .apple-select-menu {
-  background: rgba(255, 255, 255, 0.96) !important;
-  backdrop-filter: blur(24px) saturate(180%) !important;
-  border: 1px solid rgba(0, 0, 0, 0.1) !important;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12) !important;
-}
-.expanded-top-actions .fullscreen-layout-select .apple-select-option {
-  color: var(--text, #e8e2e6); border-radius: 6px; min-height: 36px; padding: 8px 10px;
-}
-:root[data-theme="light"] .expanded-top-actions .fullscreen-layout-select .apple-select-option {
-  color: #171717 !important;
-}
-.expanded-top-actions .fullscreen-layout-select .apple-select-option:hover {
-  background: var(--bg-subtle-button-hover, rgba(255, 255, 255, 0.08));
-  color: var(--text, #fff);
-}
-:root[data-theme="light"] .expanded-top-actions .fullscreen-layout-select .apple-select-option:hover {
-  background: rgba(0, 0, 0, 0.05) !important;
-  color: #000000 !important;
-}
-.expanded-top-actions .fullscreen-layout-select .apple-select-option.selected {
-  background: rgba(var(--accent-rgb), 0.16);
-  color: var(--accent);
-}
-:root[data-theme="light"] .expanded-top-actions .fullscreen-layout-select .apple-select-option.selected {
-  background: rgba(var(--accent-rgb), 0.12) !important;
-  color: var(--accent) !important;
-}
+

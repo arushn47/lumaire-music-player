@@ -7,6 +7,14 @@ const song: CatalogTrack = { id: "saavn:12345678", title: 'Evening Sky (From "Fi
 const video: YtdlpSearchResult = { id: "abcdefghijk", title: "Evening Sky - Video Song | Guest | Film | HD", channel: "Film Label", duration: 216, thumbnail: null };
 
 describe("shared recording identity", () => {
+  it('rejects the Hola Amigo overdub even with matching original-song Content ID credits',async()=>{
+    const catalog={...song,id:'saavn:M4t__2Pc',title:'Hola Amigo',artist:'Umair, KR$NA, Seedhe Maut',artists:[{name:'Umair'},{name:'KR$NA'},{name:'Seedhe Maut'}],duration:226};
+    const bad={id:'wEnj5LfAS_0',title:'Hola Amigo - BAN$AL X Seedhe Maut X KR$NA',channel:'BAN$AL',track:'Hola Amigo',artist:'KR$NA, Seedhe Maut, Umair',duration:226,thumbnail:null};
+    expect(await matchSource(catalog,bad)).toMatchObject({accepted:false,reason:'additional-performer'});
+    expect(await matchSource(catalog,{...bad,id:'g12hFFO6KCI',title:'Hola Amigo',channel:'KR$NA',artist:'KR$NA, Seedhe Maut, Umair'})).toMatchObject({accepted:true});
+    expect(await matchSource(catalog,{...bad,title:'Hola Amigo - KR$NA X Seedhe Maut (Official Audio)'})).toMatchObject({accepted:true});
+    expect(await matchSource(catalog,{...bad,title:'Seedhe Maut x Kr$na - Hola Amigo || Legacy Performance'})).toMatchObject({accepted:false,reason:'recording-version'});
+  });
   it("verifies a complete match before extracting incomplete alternatives", async () => {
     const incomplete = { ...video, id: "incomplete1", duration: null };
     const search = vi.fn().mockResolvedValue([incomplete, video]);

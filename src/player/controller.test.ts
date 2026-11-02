@@ -68,17 +68,26 @@ describe("single-owner playback lifecycle", () => {
     await first;
     controller.stop();
   });
-  it("retries failed remote audio once and reports engine failure without a success state", async () => {
-    const resolve = vi.fn(async (_id: string, retry?: boolean) => retry ? "https://audio.example/second" : "https://audio.example/first");
+  it("bounds recovery to one URL refresh and one alternative, preserving position and ignoring duplicate errors", async () => {
+    const resolve = vi.fn(async (_id: string, retry?: boolean, alternative?: boolean) => alternative ? "https://audio.example/third" : retry ? "https://audio.example/second" : "https://audio.example/first");
     const controller = new PlaybackController(resolve);
     await controller.load("youtube:abcdefghijk", true);
     const audio = controller.audio as unknown as FakeAudio;
+    audio.loaded(); audio.currentTime = 12; audio.dispatchEvent(new Event("timeupdate"));
+    const playbackId = controller.state.playbackId;
+    audio.dispatchEvent(new Event("error"));
     audio.dispatchEvent(new Event("error"));
     await vi.waitFor(() => expect(resolve).toHaveBeenCalledWith("youtube:abcdefghijk", true));
     await vi.waitFor(() => expect(audio.src).toContain("second"));
+    audio.loaded();
+    expect(audio.currentTime).toBe(12);
+    expect(controller.state.playbackId).toBe(playbackId);
+    audio.dispatchEvent(new Event("error"));
+    await vi.waitFor(() => expect(resolve).toHaveBeenCalledWith("youtube:abcdefghijk", true, true));
+    await vi.waitFor(() => expect(audio.src).toContain("third"));
     audio.dispatchEvent(new Event("error"));
     expect(controller.state.status).toBe("error");
-    expect(resolve).toHaveBeenCalledTimes(2);
+    expect(resolve).toHaveBeenCalledTimes(3);
     controller.stop();
   });
   it("times out a stalled load and cancels the timer on stop", async () => {

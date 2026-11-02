@@ -6,6 +6,9 @@ import org.json.JSONObject
 
 /** Headers apply to one exact stream URI; local files never use this factory. */
 object ScopedHttpHeaders {
+    private val refusals = java.util.concurrent.atomic.AtomicInteger(0)
+    // Exhaust ExoPlayer's initial request and three internal retries before testing URL refresh.
+    fun debugRefuseNext() { check(BuildConfig.DEBUG); refusals.set(4) }
     private var uri: String? = null
     private var values: Map<String, String> = emptyMap()
     @Synchronized fun register(source: Uri, headers: JSONObject?) {
@@ -22,6 +25,8 @@ object ScopedHttpHeaders {
             private val listeners = mutableListOf<TransferListener>()
             override fun addTransferListener(listener: TransferListener) { listeners.add(listener); delegate?.addTransferListener(listener) }
             override fun open(spec: DataSpec): Long {
+                if (BuildConfig.DEBUG && refusals.getAndUpdate { (it - 1).coerceAtLeast(0) } > 0)
+                    throw HttpDataSource.InvalidResponseCodeException(403, "Controlled test refusal", null, emptyMap(), spec, ByteArray(0))
                 val source = DefaultHttpDataSource.Factory().setConnectTimeoutMs(15000).setReadTimeoutMs(15000)
                     .setDefaultRequestProperties(forSource(spec.uri)).createDataSource()
                 listeners.forEach { source.addTransferListener(it) }; delegate = source

@@ -1,0 +1,304 @@
+{
+  "provenance": "Retained test-results/lyrics-provider-comparison.json; no new provider requests",
+  "cases": [
+    {
+      "language": "Tamil",
+      "queryTitle": "Golden Sparrow",
+      "queryArtist": "G.V. Prakash Kumar",
+      "records": [
+        {
+          "isrc": "IND292217347",
+          "title": "Golden Sparrow (From \"Nilavuku En Mel Ennadi Kobam\")",
+          "artist": "G.V. Prakash Kumar, Arivu, Dhanush, Sublahshini",
+          "duration": 230.4
+        },
+        {
+          "isrc": "IND292500295",
+          "title": "Yedi x Golden Sparrow (From \"Nilavuku En Mel Ennadi Kobam\")",
+          "artist": "G.V. Prakash Kumar, Arivu, Sublahshini, Dhanush",
+          "duration": 56.96
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "Tamil",
+      "queryTitle": "Yedi",
+      "queryArtist": "Dhanush",
+      "records": [
+        {
+          "isrc": "IND292218474",
+          "title": "Yedi (From \"Nilavuku En Mel Ennadi Kobam\")",
+          "artist": "G.V. Prakash Kumar, 維瓦克, Dhanush, Jonita Gandhi",
+          "duration": 201.618
+        },
+        {
+          "isrc": "IND292500295",
+          "title": "Yedi x Golden Sparrow (From \"Nilavuku En Mel Ennadi Kobam\")",
+          "artist": "G.V. Prakash Kumar, Arivu, Sublahshini, Dhanush",
+          "duration": 56.96
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "Malayalam",
+      "queryTitle": "Darshana",
+      "queryArtist": "Hesham Abdul Wahab",
+      "records": [
+        {
+          "isrc": "INT202102847",
+          "title": "Darshana",
+          "artist": "Hesham Abdul Wahab, Darshana Rajendran",
+          "duration": 225.116
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "Telugu",
+      "queryTitle": "Inkem Inkem Inkem Kaavaale",
+      "queryArtist": "Sid Sriram",
+      "records": [
+        {
+          "isrc": "INA091816158",
+          "title": "Inkem Inkem Inkem Kaavaale (From \"Geetha Govindam\")",
+          "artist": "Gopi Sundar, Sid Sriram",
+          "duration": 266.715
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "Hindi",
+      "queryTitle": "Tum Hi Ho",
+      "queryArtist": "Arijit Singh",
+      "records": [
+        {
+          "isrc": "INS181303031",
+          "title": "Tum Hi Ho (From \"Aashiqui 2\")",
+          "artist": "Arijit Singh",
+          "duration": 261.974
+        },
+        {
+          "isrc": "INS181303860",
+          "title": "Tum Hi Ho (Remix)",
+          "artist": "Arijit Singh",
+          "duration": 237.338
+        },
+        {
+          "isrc": "INS182200201",
+          "title": "Pachtaoge-Tum Hi Ho Lofi Mix",
+          "artist": "Arijit Singh, Dj Abhi India",
+          "duration": 223.039
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "Punjabi",
+      "queryTitle": "Wavy",
+      "queryArtist": "Karan Aujla",
+      "records": [
+        {
+          "isrc": "AUBEC2362614",
+          "title": "Wavy",
+          "artist": "Karan Aujla, Jay Trak",
+          "duration": 161
+        },
+        {
+          "isrc": "US23A9729171",
+          "title": "Wavy (Mixed)",
+          "artist": "Karan Aujla, Jay Trak",
+          "duration": 101.305
+        },
+        {
+          "isrc": "US23A8751502",
+          "title": "Wavy (Mixed)",
+          "artist": "Karan Aujla",
+          "duration": 98.801
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "English",
+      "queryTitle": "Snowman",
+      "queryArtist": "Sia",
+      "records": [
+        {
+          "isrc": "USAT21704212",
+          "title": "Snowman",
+          "artist": "Sia Furler",
+          "duration": 165.907
+        },
+        {
+          "isrc": "USAT22219649",
+          "title": "Snowman (Sped Up Version)",
+          "artist": "Sia",
+          "duration": 137.578
+        },
+        {
+          "isrc": "USAT22106552",
+          "title": "Snowman (Slowed Down)",
+          "artist": "Sia Furler",
+          "duration": 180.275
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "Spanish",
+      "queryTitle": "Despacito",
+      "queryArtist": "Luis Fonsi",
+      "records": [
+        {
+          "isrc": "USUM71607007",
+          "title": "Despacito",
+          "artist": "Luis Fonsi, Daddy Yankee",
+          "duration": 230.467
+        },
+        {
+          "isrc": "USUM71703825",
+          "title": "Despacito (feat. Justin Bieber) [Remix]",
+          "artist": "Luis Fonsi, Daddy Yankee",
+          "duration": 230.693
+        },
+        {
+          "isrc": "USUM71713833",
+          "title": "Despacito (Mandarin Version) [feat. JJ Lin]",
+          "artist": "Luis Fonsi",
+          "duration": 228.933
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "Japanese",
+      "queryTitle": "Idol",
+      "queryArtist": "YOASOBI",
+      "records": [
+        {
+          "isrc": "JPP302300335",
+          "title": "Idol",
+          "artist": "YOASOBI",
+          "duration": 213.234
+        },
+        {
+          "isrc": "QZK6J2340145",
+          "title": "Idol (From \"Oshi no Ko\") [English Cover]",
+          "artist": "JubyPhonic",
+          "duration": 213.592
+        },
+        {
+          "isrc": "QZPJ32266193",
+          "title": "Idol (Russian Ver.)",
+          "artist": "サティ・アクラ",
+          "duration": 214
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed"
+    },
+    {
+      "language": "English",
+      "queryTitle": "Dynamite",
+      "queryArtist": "BTS",
+      "records": [
+        {
+          "isrc": "USA2P2531708",
+          "title": "Dynamite (Live)",
+          "artist": "BTS",
+          "duration": 196.951
+        },
+        {
+          "isrc": "QM7282022872",
+          "title": "Dynamite",
+          "artist": "BTS",
+          "duration": 199.054
+        },
+        {
+          "isrc": "QMBZ92016548",
+          "title": "Dynamite (Midnight Remix)",
+          "artist": "BTS",
+          "duration": 196.509
+        }
+      ],
+      "observation": "Retained provider search metadata; lyric text and acoustic timing not reviewed",
+      "artistRegion": "Korean"
+    }
+  ],
+  "windowsNativeFollowups": [
+    {
+      "track": {
+        "title": "Snowman",
+        "artist": "Sia",
+        "album": "Everyday Is Christmas",
+        "duration": 165.907
+      },
+      "kind": "synced",
+      "matched": {
+        "id": 701268,
+        "provider": "lrclib",
+        "title": "Snowman",
+        "artist": "Sia",
+        "album": "Everyday Is Christmas",
+        "duration": 166
+      },
+      "evidence": "Windows native fetch_lyrics; metadata/timing verification only, not acoustic review"
+    },
+    {
+      "track": {
+        "title": "Despacito (feat. Justin Bieber) [Remix]",
+        "artist": "Luis Fonsi, Daddy Yankee, Justin Bieber",
+        "album": "",
+        "duration": 230.693
+      },
+      "kind": "synced",
+      "matched": {
+        "id": 24233002,
+        "provider": "lrclib",
+        "title": "Despacito (Remix)",
+        "artist": "Luis Fonsi",
+        "album": "Radio Veronica's Zomer Top 250",
+        "duration": 230.452245
+      },
+      "evidence": "Windows native fetch_lyrics; metadata/timing verification only, not acoustic review"
+    },
+    {
+      "track": {
+        "title": "Sukoon",
+        "artist": "Gini",
+        "album": "Sukoon",
+        "duration": 186
+      },
+      "kind": "synced",
+      "matched": {
+        "id": 35155455,
+        "provider": "lrclib",
+        "title": "Sukoon",
+        "artist": "Gini",
+        "album": "Sukoon (Dolby Atmos Version)",
+        "duration": 186
+      },
+      "evidence": "Windows native fetch_lyrics; metadata/timing verification only, not acoustic review"
+    },
+    {
+      "track": {
+        "title": "Rathinamo (Female Version)",
+        "artist": "Saurav Srisan, Tanisha Gnavel",
+        "album": "",
+        "duration": 177
+      },
+      "kind": "synced",
+      "matched": {
+        "id": 38531153,
+        "provider": "lrclib",
+        "title": "Rathinamo - Female Version",
+        "artist": "Saurav Srisan",
+        "album": "Rathinamo (Female Version)",
+        "duration": 177
+      },
+      "evidence": "Windows native fetch_lyrics; metadata/timing verification only, not acoustic review"
+    }
+  ]
+}

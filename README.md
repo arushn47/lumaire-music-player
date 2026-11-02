@@ -41,7 +41,7 @@ Compare the result with that release's `SHA256SUMS.txt`. A checksum detects a ch
 
 Lumaire is under active development. The existing 1.0.4 preview APK was installed and launched on a Motorola Edge 50 Pro; broad mobile feature testing remains incomplete. The existing preview EXE/APK files predate the Windows updater implementation.
 
-Manual Windows updates through **Settings → About** are implemented in source. GitHub-hosted signing/publication and a complete installed-app upgrade still require verification. Android uses manual APK installation; it does not use the Windows updater.
+Manual Windows updates through **Settings → About** are implemented in source. GitHub-hosted signing/publication and a complete installed-app upgrade still require verification. Android uses manual APK installation; it does not use the Windows updater. The streaming engine is maintained separately inside Lumaire: Windows and Android check official stable yt-dlp releases at most daily, verify downloads, and retain a fallback if an update fails. This does not require a YouTube account or browser cookies.
 
 ## Features
 

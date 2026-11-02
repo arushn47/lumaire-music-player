@@ -157,6 +157,11 @@
   transform: scale(0.92);
   background: var(--np-btn-hover);
 }
+.mobile-np-header-placeholder {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+}
 
 /* ── Apple Segmented Pills Switcher ── */
 .mobile-np-segmented-tabs {
@@ -341,6 +346,18 @@
   transform: scale(0.85);
 }
 .mobile-np-fav-btn.is-favorite {
+  color: var(--accent);
+}
+.mobile-np-identity-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.mobile-np-fav-btn.mobile-np-playlist-btn {
+  color: var(--np-text-secondary);
+}
+.mobile-np-fav-btn.mobile-np-playlist-btn:active {
   color: var(--accent);
 }
 

@@ -3,9 +3,21 @@ import type { LyricLine } from "../../domain/types";
 import { wordProgress } from "../../domain/lyrics";
 import "./word-lyrics.css";
 
-export function WordLyrics({ line, clock }: { line: LyricLine; clock: number }) {
-  if (!line.words?.length) return <>{line.text}</>;
-  return <>{line.words.map((word, index) => {
+export function WordLyrics({ line, clock, text = line.text }: { line: LyricLine; clock: number; text?: string }) {
+  if (!line.words?.length) return <>{text}</>;
+  const displayWords = text === line.text
+    ? line.words
+    : (() => {
+        const tokens = text.match(/\S+/gu) ?? [];
+        const sourceWords = line.words.map(word => word.text.trim()).filter(Boolean);
+        if (tokens.length !== line.words.length || sourceWords.length !== line.words.length) return null;
+        return line.words.map((word, index) => {
+          const match = word.text.match(/^(\s*)(\S+)(\s*)$/u);
+          return match ? { ...word, text: `${match[1]}${tokens[index]}${match[3]}` } : word;
+        });
+      })();
+  if (!displayWords) return <>{text}</>;
+  return <>{displayWords.map((word, index) => {
     const progress = wordProgress(word, clock);
     const active = Number.isFinite(clock) && clock >= word.time && (word.end === undefined || clock < word.end);
     // Overlapping, one-way rises form a wave; the sung word never pulses back down.

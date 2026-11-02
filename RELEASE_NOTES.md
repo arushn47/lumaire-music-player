@@ -1,30 +1,29 @@
-# Lumaire v1.0.7
+# Lumaire v1.0.8
 
-Less waiting when you replay a song, more consistent listening history, and a more comfortable Lumaire on your phone. This update is available for Windows and Android.
+Lyrics that keep up, cleaner artist searches, and update controls you can actually find. Available for Windows and Android.
 
-## Playback that gets along better
+## Keep the music and lyrics together
 
-- Android no longer fetches the same stream twice just to start playback. In our Motorola Edge 50 Pro tests, selecting the same song again went from about 5.5 seconds to 1.1 seconds. First-time song searches can still take a while.
-- Searches no longer cancel each other unexpectedly. Switching songs still cancels the old request, so a late result cannot take over your player.
-- Better candidate checking avoids unnecessary lookups while keeping the checks for the right artist, recording and version.
-- Streaming and downloads enforce audio-only formats. Older affected downloads can be repaired without re-encoding their audio.
+- Fixed lyrics quietly dropping out of sync while a song kept playing. Automatic scrolling now keeps following the song; you can still scroll yourself and tap “Back to sync” to return.
+- Android saves your playback position when you close Lumaire from Recents, then reopens paused at that position. Closing the app stops playback; switching apps or locking the screen lets it continue.
+- Tapping the Android media notification opens Lumaire again.
 
-## Your music across devices
+## Find the artist you meant
 
-- Listening history uses the metadata saved with each play, fixing artist and album counts that could differ between your phone and PC.
-- Favorites can sync alongside playlists and listening history on the same Wi-Fi. A separate Favorites switch lets you choose what to share; both devices need this update for favorite syncing.
-- Autoplay keeps the language of the song you started with. When genre or mood information is missing, it uses same-language recommendations rather than guessing.
+- Artist searches no longer fill up with collaboration entries. Matching profiles can combine when enough recordings confirm they belong to the same artist; uncertain namesakes stay separate.
+- Either original artist link opens a confirmed combined profile. Favorites recognize both identities, and removing a favorite clears its matched aliases.
+- Fixed spaces disappearing while you typed a search, including names such as Anirudh Ravichander.
 
-## A little easier every day
+## Less friction around your music
 
-- Refined Android navigation, player controls and layouts. Home-screen widgets now use colors from the cover art, cleaner controls and balanced spacing. The lyrics widget keeps the song title at the top and fills the available space with upcoming lines.
-- Android Back closes the current panel or returns through your screens. Double-tap Discover to jump into search.
-- Clearer lyric settings and word-timed lyrics when available, plus smaller fixes to playlist saving, notifications and library controls.
+- Update downloads now have a large, highlighted button in a dedicated action area. It stays visible while you read the notes. This version's changes come first; earlier notes are collapsed.
+- Clearer online playback setup, with visible download progress, cancellation and retry controls. Lumaire checks for stable yt-dlp engine updates automatically and keeps a fallback if an update fails.
+- Improved interrupted download recovery and fixed a sync conflict affecting older saved favorites and playlists.
 
-## Installing the update
+## Installing
 
-**Windows:** use Settings → About → Check for updates, or run the Windows installer below. Keep your existing installation to retain your library and settings.
+**Windows:** download the update in Lumaire, then choose “Restart & Update” when you are ready. You can also run the Windows setup file attached to this release. Your library and settings stay in place.
 
-**Android:** download the ARM64 APK from the Android release and install it over an existing public Lumaire build. Do not uninstall first; your library and settings stay in place. Development-signed builds use a different certificate and cannot be upgraded with the public APK. Android updates are installed manually.
+**Android:** download the ARM64 APK attached to this release and open it to update Lumaire. Android asks you to confirm installation. Keep the existing app installed to preserve your data. Development builds with a different signing certificate cannot be updated with the public APK.
 
-Playback was checked on Windows and a Motorola Edge 50 Pro. Online audio still depends on its provider: a new song may take time to start, and temporary availability errors can still happen. Background Autoplay across the end of a song remains a known Android limitation. Optional AI lyric features require your own configured key.
+Online playback still depends on provider availability and your connection. Artist verification may leave duplicates separate when the evidence is incomplete. Windows installers do not have an Authenticode publisher certificate.

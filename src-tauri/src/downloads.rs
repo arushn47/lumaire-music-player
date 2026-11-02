@@ -1,9 +1,9 @@
-use crate::{allow, err, resolve_commons_audio, work, Result, Track};
+use crate::{allow, err, resolve_commons_audio_inner, work, Result, Track};
 use rusqlite::{params, OptionalExtension};
 use std::{
     collections::HashMap,
     fs,
-    io::Write,
+    io::{Seek, Write},
     path::PathBuf,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -62,10 +62,21 @@ impl Drop for Job {
         }
     }
 }
-struct Partial(PathBuf);
+struct Partial {
+    path: PathBuf,
+    keep_on_drop: bool,
+}
+impl Partial {
+    #[cfg_attr(not(test), allow(dead_code))]
+    fn new(path: PathBuf) -> Self {
+        Self { path, keep_on_drop: false }
+    }
+}
 impl Drop for Partial {
     fn drop(&mut self) {
-        let _ = fs::remove_file(&self.0);
+        if !self.keep_on_drop {
+            let _ = fs::remove_file(&self.path);
+        }
     }
 }
 
@@ -231,6 +242,33 @@ mod tests {
             );
         }
     }
+    #[test]
+    fn content_range_parsing_handles_standard_wildcard_and_invalid_formats() {
+        assert_eq!(
+            parse_content_range("bytes 0-1048575/4194304"),
+            Some(ContentRange { start: 0, end: 1048575, total: Some(4194304) })
+        );
+        assert_eq!(
+            parse_content_range("bytes 2097152-4194303/4194304"),
+            Some(ContentRange { start: 2097152, end: 4194303, total: Some(4194304) })
+        );
+        assert_eq!(
+            parse_content_range("bytes 0-500/*"),
+            Some(ContentRange { start: 0, end: 500, total: None })
+        );
+        assert_eq!(parse_content_range(""), None);
+        assert_eq!(parse_content_range("items 0-10/100"), None);
+        assert_eq!(parse_content_range("bytes abc-def/ghi"), None);
+        assert_eq!(parse_content_range("bytes 0-10"), None);
+        assert_eq!(parse_content_range("bytes 10-9/100"), None);
+        assert_eq!(parse_content_range("bytes 0-10/10"), None);
+        assert_eq!(parse_content_range("bytes 0-10/100/extra"), None);
+        assert_eq!(parse_content_range("bytes 0-10-20/100"), None);
+        assert!(content_range_matches("bytes 8-15/100", 8, 15, 100));
+        assert!(!content_range_matches("bytes 7-15/100", 8, 15, 100));
+        assert!(!content_range_matches("bytes 8-16/100", 8, 15, 100));
+        assert!(!content_range_matches("bytes 8-15/101", 8, 15, 100));
+    }
     fn wav() -> String {
         let mut bytes = b"RIFF".to_vec();
         bytes.extend(52u32.to_le_bytes());
@@ -263,7 +301,7 @@ mod tests {
             let (url, server) = crate::provider_http::tests::server(vec![(status, body)]);
             let path = std::env::temp_dir().join(format!("{}.part", uuid::Uuid::new_v4()));
             {
-                let _partial = Partial(path.clone());
+                let _partial = Partial::new(path.clone());
                 let events = Arc::new(Mutex::new(Vec::new()));
                 let recorded = events.clone();
                 let channel = tauri::ipc::Channel::<DownloadProgress>::new(move |body| {
@@ -291,6 +329,25 @@ mod tests {
         }
     }
 
+    
+    #[test]
+    fn download_queue_persists_and_recovers_interrupted_tracks() {
+        let mut db = rusqlite::Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE download_queue (track_id TEXT PRIMARY KEY, collection_id TEXT NOT NULL, title TEXT NOT NULL, status TEXT NOT NULL, added_at INTEGER NOT NULL);
+            INSERT INTO download_queue VALUES ('t1', 'col1', 'Song 1', 'downloading', 100), ('t2', 'col1', 'Song 2', 'completed', 101);").unwrap();
+        crate::initialize(&mut db).unwrap();
+        db.execute("UPDATE download_queue SET status='pending' WHERE status='downloading'", []).unwrap();
+        let status: String = db.query_row("SELECT status FROM download_queue WHERE track_id='t1'", [], |r| r.get(0)).unwrap();
+        assert_eq!(status, "pending");
+        let completed: String = db.query_row("SELECT status FROM download_queue WHERE track_id='t2'", [], |r| r.get(0)).unwrap();
+        assert_eq!(completed, "completed");
+        let track = serde_json::json!({"id":"t1","title":"Song 1","artist":"Artist","album":"Album","artists":[],"duration":60});
+        db.execute("UPDATE download_queue SET track_data=?1 WHERE track_id='t1'", [track.to_string()]).unwrap();
+        let mut stmt = db.prepare("SELECT track_id,collection_id,title,status,added_at,track_data FROM download_queue WHERE track_id='t1'").unwrap();
+        let restored = stmt.query_row([], download_queue_entry).unwrap();
+        assert_eq!(restored.track, Some(track));
+    }
+
     #[test]
     #[ignore = "explicit licensed Commons transfer check; requires network"]
     fn live_licensed_commons_audio_transfer() {
@@ -302,28 +359,29 @@ mod tests {
             let tracks = crate::search_commons_audio("piano".into()).await.unwrap();
             assert!(!tracks.is_empty(), "No licensed audio returned");
             let source = &tracks[0].source;
-            let media = crate::resolve_commons_audio(source.source_id.clone())
+            let media = crate::resolve_commons_audio_inner(source.source_id.clone())
                 .await
                 .unwrap();
             let path = std::env::temp_dir().join(format!("{}.part", uuid::Uuid::new_v4()));
-            let _partial = Partial(path.clone());
-            let response = reqwest::Client::builder()
+            let _partial = Partial::new(path.clone());
+            let client = reqwest::Client::builder()
                 .redirect(reqwest::redirect::Policy::none())
                 .timeout(Duration::from_secs(30))
                 .user_agent("Lumaire/0.1 licensed offline audio")
                 .build()
-                .unwrap()
-                .get(&media.url)
-                .send()
+                .unwrap();
+            let started = std::time::Instant::now();
+            let cancel = AtomicBool::new(false);
+            transfer_resumable_audio(&client, &media.url, &path, &cancel, false, None)
                 .await
                 .unwrap();
-            transfer_audio(response, &path, &AtomicBool::new(false), None)
-                .await
-                .unwrap();
-            assert!(fs::metadata(&path).unwrap().len() > 44);
+            let elapsed = started.elapsed();
+            let file_len = fs::metadata(&path).unwrap().len();
+            let mb_per_sec = (file_len as f64 / 1_048_576.0) / elapsed.as_secs_f64();
+            assert!(file_len > 44);
             eprintln!(
-                "Verified licensed audio: {} | {} | {} | {}",
-                tracks[0].title, source.attribution, source.license, source.page_url
+                "Verified licensed audio transfer: {} bytes in {:.2}s ({:.2} MB/s) | {} | {} | {}",
+                file_len, elapsed.as_secs_f64(), mb_per_sec, tracks[0].title, source.attribution, source.license
             );
         });
     }
@@ -396,7 +454,7 @@ pub async fn download_track(app: tauri::AppHandle, webview: tauri::Webview, id: 
         (audio.stream_url, extension, reqwest::header::HeaderMap::new())
         }
     } else if source.provider_id == "wikimedia-commons" {
-        let media = resolve_commons_audio(source.source_id.clone()).await?;
+        let media = resolve_commons_audio_inner(source.source_id.clone()).await?;
         if let Some(source) = track.source.as_mut() {
             source.license = media.license;
             source.license_url = media.license_url;
@@ -417,30 +475,52 @@ pub async fn download_track(app: tauri::AppHandle, webview: tauri::Webview, id: 
         return Err("Download cancelled.".into());
     }
     let directory = root(&app)?;
-    let token = uuid::Uuid::new_v4();
-    let partial = Partial(directory.join(format!("{token}.part")));
+    let token = uuid::Uuid::new_v5(&uuid::Uuid::NAMESPACE_OID, track.id.as_bytes());
+    let partial_path = directory.join(format!("{token}.part"));
     let destination = directory.join(format!("{token}.{extension}"));
+    let mut partial = Partial {
+        path: partial_path.clone(),
+        keep_on_drop: false,
+    };
     let client = reqwest::Client::builder()
         .default_headers(headers)
         .redirect(reqwest::redirect::Policy::none())
-        .connect_timeout(Duration::from_secs(5))
-        .timeout(Duration::from_secs(180))
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(30))
         .user_agent("Mozilla/5.0 Lumaire/0.1 offline audio")
         .build()
         .map_err(err)?;
     progress(on_progress.as_ref(), "connecting", 0, None, 0.0);
-    let response = audio_response_for(&client, &url, &cancel, youtube).await?;
-    transfer_audio(response, &partial.0, &cancel, on_progress.as_ref()).await?;
-    fs::rename(&partial.0, &destination).map_err(err)?;
-    let mut complete = Partial(destination.clone());
-    let saved_path = destination.to_string_lossy().into_owned();
-    let saved = work(app, move |app, db| {
-        allow(app, &destination)?;
-        finish_download(db, &track, &saved_path)
-    })
-    .await?;
-    complete.0.clear(); // ownership transferred to the persisted library
-    Ok(saved)
+    match transfer_resumable_audio(&client, &url, &partial_path, &cancel, youtube, on_progress.as_ref()).await {
+        Ok(()) if cancel.load(Ordering::Relaxed) => {
+            partial.keep_on_drop = false;
+            Err("Download cancelled.".into())
+        }
+        Ok(()) => {
+            fs::rename(&partial_path, &destination).map_err(err)?;
+            partial.keep_on_drop = true;
+            let mut complete = Partial {
+                path: destination.clone(),
+                keep_on_drop: false,
+            };
+            let saved_path = destination.to_string_lossy().into_owned();
+            let saved = work(app, move |app, db| {
+                allow(app, &destination)?;
+                finish_download(db, &track, &saved_path)
+            })
+            .await?;
+            complete.keep_on_drop = true; // ownership transferred to the persisted library
+            Ok(saved)
+        }
+        Err(e) => {
+            if cancel.load(Ordering::Relaxed) {
+                partial.keep_on_drop = false; // clean up on explicit user cancel
+            } else {
+                partial.keep_on_drop = true; // keep partial file for resumable retry
+            }
+            Err(e)
+        }
+    }
 }
 
 fn finish_download(
@@ -486,6 +566,7 @@ fn finish_download(
         ],
     )
     .map_err(err)?;
+    let _ = db.execute("UPDATE download_queue SET status='completed' WHERE track_id=?1", params![track.id]);
     Ok(track)
 }
 
@@ -540,6 +621,7 @@ pub async fn delete_download(app: tauri::AppHandle, id: String, confirmed: bool)
             params![serde_json::to_string(&track).map_err(err)?, id],
         )
         .map_err(err)?;
+        let _ = db.execute("DELETE FROM download_queue WHERE track_id=?1", params![id]);
         Ok(track)
     })
     .await
@@ -558,12 +640,57 @@ fn download_location_allowed(location: &reqwest::Url, youtube: bool) -> bool {
         && location.port_or_known_default() == Some(443)
 }
 
-async fn audio_response_for(
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct ContentRange {
+    pub start: u64,
+    pub end: u64,
+    pub total: Option<u64>,
+}
+
+pub(crate) fn parse_content_range(header: &str) -> Option<ContentRange> {
+    let header = header.trim();
+    if !header.to_ascii_lowercase().starts_with("bytes ") {
+        return None;
+    }
+    let rest = &header[6..];
+    let mut parts = rest.split('/');
+    let range_part = parts.next()?;
+    let total_part = parts.next()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    let mut range_bounds = range_part.split('-');
+    let start: u64 = range_bounds.next()?.trim().parse().ok()?;
+    let end: u64 = range_bounds.next()?.trim().parse().ok()?;
+    if range_bounds.next().is_some() {
+        return None;
+    }
+    let total: Option<u64> = if total_part.trim() == "*" {
+        None
+    } else {
+        Some(total_part.trim().parse().ok()?)
+    };
+    if start > end || total.is_some_and(|total| total <= end) {
+        return None;
+    }
+    Some(ContentRange { start, end, total })
+}
+
+fn content_range_matches(header: &str, expected_start: u64, max_end: u64, expected_total: u64) -> bool {
+    parse_content_range(header).is_some_and(|range| {
+        range.start == expected_start
+            && range.end <= max_end
+            && range.total == Some(expected_total)
+    })
+}
+
+async fn audio_response_with_range(
     client: &reqwest::Client,
     url: &str,
+    range: Option<&str>,
     cancel: &AtomicBool,
     youtube: bool,
-) -> Result<reqwest::Response> {
+) -> Result<(reqwest::Url, reqwest::Response)> {
     let mut location = reqwest::Url::parse(url).map_err(|_| "Invalid download URL.")?;
     for _ in 0..5 {
         if cancel.load(Ordering::Relaxed) {
@@ -572,13 +699,16 @@ async fn audio_response_for(
         if !download_location_allowed(&location, youtube) {
             return Err("Unsupported download location.".into());
         }
-        let response =
-            tokio::time::timeout(Duration::from_secs(20), client.get(location.clone()).send())
-                .await
-                .map_err(|_| "Download connection timed out.")?
-                .map_err(|_| "Could not start the download.")?;
+        let mut req = client.get(location.clone());
+        if let Some(r) = range {
+            req = req.header(reqwest::header::RANGE, r);
+        }
+        let response = tokio::time::timeout(Duration::from_secs(15), req.send())
+            .await
+            .map_err(|_| "Download connection timed out.")?
+            .map_err(|e| format!("Could not connect to audio source: {e}"))?;
         if !response.status().is_redirection() {
-            return Ok(response);
+            return Ok((location, response));
         }
         let redirect = response
             .headers()
@@ -592,6 +722,281 @@ async fn audio_response_for(
     Err("Too many media redirects.".into())
 }
 
+#[allow(dead_code)]
+async fn audio_response_for(
+    client: &reqwest::Client,
+    url: &str,
+    cancel: &AtomicBool,
+    youtube: bool,
+) -> Result<reqwest::Response> {
+    audio_response_with_range(client, url, None, cancel, youtube).await.map(|(_, res)| res)
+}
+
+fn validate_audio_file(path: &std::path::Path) -> Result<()> {
+    lofty::probe::Probe::open(path)
+        .and_then(|probe| Ok(probe.guess_file_type()?))
+        .and_then(|probe| probe.read())
+        .map_err(|_| "The downloaded file is not readable audio.".to_string())?;
+    crate::audio_container::require_audio_only(path)?;
+    Ok(())
+}
+
+async fn transfer_resumable_audio(
+    client: &reqwest::Client,
+    initial_url: &str,
+    path: &std::path::Path,
+    cancel: &AtomicBool,
+    youtube: bool,
+    on_progress: Option<&tauri::ipc::Channel<DownloadProgress>>,
+) -> Result<()> {
+    const MAX: u64 = 200 * 1024 * 1024;
+    const CHUNK_SIZE: u64 = 2 * 1024 * 1024;
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(20);
+
+    let mut existing_len = if path.exists() {
+        fs::metadata(path).map(|m| m.len()).unwrap_or(0)
+    } else {
+        0
+    };
+    if existing_len > MAX {
+        let _ = fs::remove_file(path);
+        existing_len = 0;
+    }
+
+    let chunk_probe = format!("bytes={existing_len}-{}", existing_len + CHUNK_SIZE - 1);
+    let (final_url, mut response) = audio_response_with_range(
+        client,
+        initial_url,
+        Some(&chunk_probe),
+        cancel,
+        youtube,
+    )
+    .await?;
+
+    if response.status() == reqwest::StatusCode::RANGE_NOT_SATISFIABLE && existing_len > 0 {
+        let _ = fs::remove_file(path);
+        existing_len = 0;
+        let chunk_zero = format!("bytes=0-{}", CHUNK_SIZE - 1);
+        let res = audio_response_with_range(client, initial_url, Some(&chunk_zero), cancel, youtube).await?;
+        response = res.1;
+    }
+
+    let status = response.status();
+    if status != reqwest::StatusCode::OK && status != reqwest::StatusCode::PARTIAL_CONTENT {
+        return Err(format!("Audio transfer failed (HTTP {status}, 200 MB size limit)."));
+    }
+
+    let is_partial = status == reqwest::StatusCode::PARTIAL_CONTENT;
+    let (supports_range, total_len, offset) = if is_partial {
+        let cr_header = response
+            .headers()
+            .get("content-range")
+            .and_then(|h| h.to_str().ok());
+        let cr = cr_header.and_then(parse_content_range)
+            .ok_or("206 Partial Content has an invalid Content-Range header.")?;
+        let total = cr.total.ok_or("Server did not return total audio length.")?;
+        if total > MAX {
+            return Err(format!("Audio exceeds download limit ({total} > {MAX} bytes)."));
+        }
+        let expected_end = std::cmp::min(existing_len + CHUNK_SIZE - 1, total - 1);
+        if !content_range_matches(cr_header.unwrap_or_default(), existing_len, expected_end, total)
+            || response.content_length().is_some_and(|length| length != cr.end - cr.start + 1)
+        {
+            let _ = fs::remove_file(path);
+            return Err("Audio server returned the wrong byte range.".into());
+        }
+        (true, total, existing_len)
+    } else {
+        if existing_len > 0 {
+            let _ = fs::remove_file(path);
+            existing_len = 0;
+        }
+        let total = response
+            .content_length()
+            .ok_or("Audio server did not provide content length.")?;
+        if total > MAX {
+            return Err(format!("Audio exceeds download limit ({total} > {MAX} bytes)."));
+        }
+        (false, total, 0)
+    };
+
+    if existing_len >= total_len && total_len > 0 {
+        progress(on_progress, "validating", total_len, Some(total_len), 0.0);
+        return validate_audio_file(path);
+    }
+
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .write(true)
+        .append(supports_range && offset > 0)
+        .truncate(!supports_range || offset == 0)
+        .open(path)
+        .map_err(err)?;
+
+    let mut received = offset;
+    let started = std::time::Instant::now();
+    let mut last_progress = started;
+
+    progress(on_progress, "transferring", received, Some(total_len), 0.0);
+
+    if !supports_range {
+        while let Some(chunk) = match tokio::time::timeout(IDLE_TIMEOUT, response.chunk()).await {
+            Err(_) => return Err("Download stalled: connection timed out waiting for data.".into()),
+            Ok(c) => c.map_err(|e| format!("Download interrupted: {e}"))?,
+        } {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("Download cancelled.".into());
+            }
+            received += chunk.len() as u64;
+            if received > MAX {
+                return Err("Audio exceeds the 200 MB download limit.".into());
+            }
+            file.write_all(&chunk).map_err(err)?;
+            if last_progress.elapsed() >= Duration::from_millis(200) {
+                let bps = (received - offset) as f64 / started.elapsed().as_secs_f64().max(0.001);
+                progress(on_progress, "transferring", received, Some(total_len), bps);
+                last_progress = std::time::Instant::now();
+            }
+        }
+    } else {
+        let mut current_stream = response;
+        let first_target = std::cmp::min(offset + CHUNK_SIZE, total_len);
+
+        while received < first_target {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("Download cancelled.".into());
+            }
+            let chunk = match tokio::time::timeout(IDLE_TIMEOUT, current_stream.chunk()).await {
+                Err(_) => break,
+                Ok(c) => match c {
+                    Ok(Some(c)) => c,
+                    _ => break,
+                },
+            };
+            received += chunk.len() as u64;
+            file.write_all(&chunk).map_err(err)?;
+            if last_progress.elapsed() >= Duration::from_millis(200) {
+                let bps = (received - offset) as f64 / started.elapsed().as_secs_f64().max(0.001);
+                progress(on_progress, "transferring", received, Some(total_len), bps);
+                last_progress = std::time::Instant::now();
+            }
+        }
+        file.flush().map_err(err)?;
+
+        while received < total_len {
+            if cancel.load(Ordering::Relaxed) {
+                return Err("Download cancelled.".into());
+            }
+            let chunk_end = std::cmp::min(received + CHUNK_SIZE - 1, total_len - 1);
+            let mut chunk_downloaded = false;
+            let mut last_error = String::new();
+
+            for attempt in 0..3 {
+                if cancel.load(Ordering::Relaxed) {
+                    return Err("Download cancelled.".into());
+                }
+                if attempt > 0 {
+                    let delay = Duration::from_millis(400 * (1 << attempt));
+                    tokio::time::sleep(delay).await;
+                }
+
+                let range_str = format!("bytes={received}-{chunk_end}");
+                let chunk_res = tokio::time::timeout(
+                    IDLE_TIMEOUT,
+                    client.get(final_url.clone()).header(reqwest::header::RANGE, range_str).send(),
+                )
+                .await;
+
+                let mut chunk_resp = match chunk_res {
+                    Ok(Ok(resp)) => resp,
+                    Ok(Err(e)) => {
+                        last_error = e.to_string();
+                        continue;
+                    }
+                    Err(_) => {
+                        last_error = "Connection timed out waiting for chunk.".into();
+                        continue;
+                    }
+                };
+
+                if chunk_resp.status() != reqwest::StatusCode::PARTIAL_CONTENT {
+                    last_error = format!("HTTP {}", chunk_resp.status());
+                    continue;
+                }
+
+                let range_header = chunk_resp.headers().get("content-range").and_then(|h| h.to_str().ok());
+                let range = range_header.and_then(parse_content_range);
+                if !range_header.is_some_and(|header| content_range_matches(header, received, chunk_end, total_len))
+                    || range.as_ref().is_some_and(|range| chunk_resp.content_length().is_some_and(|length| length != range.end - range.start + 1))
+                {
+                    last_error = "Server returned an invalid byte range.".into();
+                    continue;
+                }
+
+                let chunk_start_received = received;
+                let mut chunk_success = true;
+
+                loop {
+                    let chunk_item = match tokio::time::timeout(IDLE_TIMEOUT, chunk_resp.chunk()).await {
+                        Ok(Ok(Some(d))) => Some(d),
+                        Ok(Ok(None)) => None,
+                        Ok(Err(e)) => {
+                            last_error = e.to_string();
+                            chunk_success = false;
+                            break;
+                        }
+                        Err(_) => {
+                            last_error = "Chunk read timed out.".into();
+                            chunk_success = false;
+                            break;
+                        }
+                    };
+                    let Some(data) = chunk_item else {
+                        break;
+                    };
+                    if cancel.load(Ordering::Relaxed) {
+                        return Err("Download cancelled.".into());
+                    }
+                    received += data.len() as u64;
+                    if let Err(e) = file.write_all(&data) {
+                        return Err(err(e));
+                    }
+                    if last_progress.elapsed() >= Duration::from_millis(200) {
+                        let bps = (received - offset) as f64 / started.elapsed().as_secs_f64().max(0.001);
+                        progress(on_progress, "transferring", received, Some(total_len), bps);
+                        last_progress = std::time::Instant::now();
+                    }
+                }
+
+                if chunk_success {
+                    file.flush().map_err(err)?;
+                    chunk_downloaded = true;
+                    break;
+                } else {
+                    received = chunk_start_received;
+                    let _ = file.seek(std::io::SeekFrom::Start(received));
+                    let _ = file.set_len(received);
+                }
+            }
+
+            if !chunk_downloaded {
+                return Err(format!("Download failed at {received}/{total_len} bytes: {last_error}"));
+            }
+        }
+    }
+
+    if received != total_len {
+        return Err(format!("Incomplete audio download ({received}/{total_len} bytes)."));
+    }
+
+    progress(on_progress, "validating", received, Some(total_len), (received - offset) as f64 / started.elapsed().as_secs_f64().max(0.001));
+    file.sync_all().map_err(err)?;
+    drop(file);
+
+    validate_audio_file(path)
+}
+
+#[allow(dead_code)]
 async fn transfer_audio(
     mut response: reqwest::Response,
     path: &std::path::Path,
@@ -599,18 +1004,33 @@ async fn transfer_audio(
     on_progress: Option<&tauri::ipc::Channel<DownloadProgress>>,
 ) -> Result<()> {
     const MAX: u64 = 200 * 1024 * 1024;
-    if response.status() != reqwest::StatusCode::OK
+    const IDLE_TIMEOUT: Duration = Duration::from_secs(20);
+    let status = response.status();
+    if (status != reqwest::StatusCode::OK && status != reqwest::StatusCode::PARTIAL_CONTENT)
         || response.content_length().is_some_and(|bytes| bytes > MAX)
     {
         return Err(format!(
             "Audio transfer failed (HTTP {}, 200 MB size limit).",
-            response.status()
+            status
         ));
     }
-    let expected = response.content_length();
+    let expected = if status == reqwest::StatusCode::PARTIAL_CONTENT {
+        let cr = response
+            .headers()
+            .get("content-range")
+            .and_then(|h| h.to_str().ok())
+            .and_then(parse_content_range);
+        match cr {
+            Some(cr) => cr.total.or_else(|| response.content_length()),
+            None => return Err("206 Partial Content missing Content-Range header.".into()),
+        }
+    } else {
+        response.content_length()
+    };
     let mut file = fs::OpenOptions::new()
-        .create_new(true)
+        .create(true)
         .write(true)
+        .truncate(true)
         .open(path)
         .map_err(err)?;
     let mut received = 0u64;
@@ -621,14 +1041,9 @@ async fn transfer_audio(
         if cancel.load(Ordering::Relaxed) {
             return Err("Download cancelled.".into());
         }
-        if started.elapsed() > Duration::from_secs(180) {
-            return Err("Download timed out. Retry when your connection is available.".into());
-        }
-        let chunk = match tokio::time::timeout(Duration::from_secs(2), response.chunk()).await {
-            Err(_) => continue,
-            Ok(chunk) => {
-                chunk.map_err(|_| "The download was interrupted. Retry to start again.")?
-            }
+        let chunk = match tokio::time::timeout(IDLE_TIMEOUT, response.chunk()).await {
+            Err(_) => return Err("Download stalled: connection timed out waiting for data.".into()),
+            Ok(c) => c.map_err(|e| format!("Download stream interrupted: {e}"))?,
         };
         let Some(chunk) = chunk else {
             break;
@@ -649,13 +1064,105 @@ async fn transfer_audio(
     progress(on_progress, "validating", received, expected, received as f64 / started.elapsed().as_secs_f64().max(0.001));
     file.sync_all().map_err(err)?;
     drop(file);
-    lofty::probe::Probe::open(path)
-        .and_then(|probe| Ok(probe.guess_file_type()?))
-        .and_then(|probe| probe.read())
-        .map_err(|_| "The downloaded file is not readable audio.".to_string())?;
-    crate::audio_container::require_audio_only(path)?;
+    validate_audio_file(path)?;
     if cancel.load(Ordering::Relaxed) {
         return Err("Download cancelled.".into());
     }
     Ok(())
+}
+
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadQueueEntry {
+    pub track_id: String,
+    pub collection_id: String,
+    pub title: String,
+    pub status: String,
+    pub added_at: i64,
+    #[serde(default)]
+    pub track: Option<serde_json::Value>,
+}
+
+fn download_queue_entry(row: &rusqlite::Row<'_>) -> rusqlite::Result<DownloadQueueEntry> {
+    let track_data: Option<String> = row.get(5)?;
+    Ok(DownloadQueueEntry {
+        track_id: row.get(0)?, collection_id: row.get(1)?, title: row.get(2)?,
+        status: row.get(3)?, added_at: row.get(4)?,
+        track: track_data.and_then(|data| serde_json::from_str(&data).ok()),
+    })
+}
+
+#[tauri::command]
+pub async fn get_download_queue(app: tauri::AppHandle, collection_id: Option<String>) -> Result<Vec<DownloadQueueEntry>> {
+    work(app, move |_, db| {
+        let mut sql = "SELECT track_id, collection_id, title, status, added_at, track_data FROM download_queue".to_string();
+        if collection_id.is_some() {
+            sql.push_str(" WHERE collection_id = ?1");
+        }
+        sql.push_str(" ORDER BY added_at ASC");
+        let mut stmt = db.prepare(&sql).map_err(err)?;
+        let rows = if let Some(ref cid) = collection_id {
+            stmt.query_map([cid], download_queue_entry).map_err(err)?.collect::<std::result::Result<Vec<_>, _>>().map_err(err)?
+        } else {
+            stmt.query_map([], download_queue_entry).map_err(err)?.collect::<std::result::Result<Vec<_>, _>>().map_err(err)?
+        };
+        Ok(rows)
+    }).await
+}
+
+#[tauri::command]
+pub async fn save_download_queue(app: tauri::AppHandle, entries: Vec<DownloadQueueEntry>) -> Result<()> {
+    work(app, move |_, db| {
+        let tx = db.transaction().map_err(err)?;
+        for entry in entries {
+            if entry.track_id.is_empty() || entry.track_id.len() > 512 || entry.collection_id.len() > 512
+                || entry.title.len() > 2048 || !matches!(entry.status.as_str(), "pending" | "downloading" | "completed" | "failed" | "paused")
+            { return Err("Invalid download queue entry.".into()); }
+            let track_data = entry.track.map(|track| {
+                if !track.is_object() || track["id"].as_str() != Some(entry.track_id.as_str()) {
+                    return Err("Download queue track identity does not match its entry.".to_string());
+                }
+                let encoded = serde_json::to_string(&track).map_err(crate::err)?;
+                if encoded.len() > 128 * 1024 { return Err("Download queue track is too large.".into()); }
+                Ok(encoded)
+            }).transpose()?;
+            tx.execute(
+                "INSERT INTO download_queue (track_id, collection_id, title, status, added_at, track_data)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+                 ON CONFLICT(track_id) DO UPDATE SET
+                   collection_id=excluded.collection_id,
+                   title=excluded.title,
+                   status=excluded.status,
+                   added_at=excluded.added_at,
+                   track_data=COALESCE(excluded.track_data, download_queue.track_data)",
+                params![entry.track_id, entry.collection_id, entry.title, entry.status, entry.added_at, track_data],
+            ).map_err(err)?;
+        }
+        tx.commit().map_err(err)?;
+        Ok(())
+    }).await
+}
+
+#[tauri::command]
+pub async fn update_download_queue_status(app: tauri::AppHandle, track_id: String, status: String) -> Result<()> {
+    work(app, move |_, db| {
+        db.execute(
+            "UPDATE download_queue SET status=?1 WHERE track_id=?2",
+            params![status, track_id],
+        ).map_err(err)?;
+        Ok(())
+    }).await
+}
+
+#[tauri::command]
+pub async fn clear_download_queue(app: tauri::AppHandle, collection_id: Option<String>) -> Result<()> {
+    work(app, move |_, db| {
+        if let Some(cid) = collection_id {
+            db.execute("DELETE FROM download_queue WHERE collection_id = ?1", params![cid]).map_err(err)?;
+        } else {
+            db.execute("DELETE FROM download_queue", []).map_err(err)?;
+        }
+        Ok(())
+    }).await
 }

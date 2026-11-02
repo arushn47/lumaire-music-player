@@ -140,6 +140,7 @@ pub async fn lyric_overlay_control(window: WebviewWindow, state: State<'_, Overl
                 overlay.show().map_err(|e| e.to_string())?;
                 status(app, true);
             } else {
+                #[allow(unused_mut)]
                 let mut builder = tauri::WebviewWindowBuilder::new(app, LABEL,
                     tauri::WebviewUrl::App("index.html?overlay=lyrics".into()))
                     .title("Lumaire · Floating lyrics").inner_size(440.0, 116.0)

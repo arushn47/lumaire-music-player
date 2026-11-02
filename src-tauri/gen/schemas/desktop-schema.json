@@ -2385,6 +2385,12 @@
           "markdownDescription": "Denies the unminimize command without any pre-configured scope."
         },
         {
+          "description": "Enables the downloadNotification command without any pre-configured scope.",
+          "type": "string",
+          "const": "lumaire-android:allow-downloadNotification",
+          "markdownDescription": "Enables the downloadNotification command without any pre-configured scope."
+        },
+        {
           "description": "Enables the navigation command without any pre-configured scope.",
           "type": "string",
           "const": "lumaire-android:allow-navigation",
@@ -2401,6 +2407,12 @@
           "type": "string",
           "const": "lumaire-android:allow-remove-listener",
           "markdownDescription": "Enables the remove_listener command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the downloadNotification command without any pre-configured scope.",
+          "type": "string",
+          "const": "lumaire-android:deny-downloadNotification",
+          "markdownDescription": "Denies the downloadNotification command without any pre-configured scope."
         },
         {
           "description": "Denies the navigation command without any pre-configured scope.",

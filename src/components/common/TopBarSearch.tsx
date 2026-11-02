@@ -1,3 +1,4 @@
+import { groupRecordings } from "../../domain/recording-groups";
 import { searchRetrieval } from "../../domain/search-retrieval";
 import { useEffect, useId, useRef, useState } from "react";
 import { Loader2, Search, X } from "lucide-react";
@@ -97,10 +98,10 @@ export function TopBarSearch({
       const update = (patch: Partial<NonNullable<typeof matches>>) => {
         if (!cancelled) setMatches(current => ({ query: trimmed, tracks: [], artists: [], albums: [], error: "", warning: "", ...(current?.query === trimmed ? current : {}), ...patch }));
       };
-      void searchRetrieval(trimmed, 5, library.searchCatalog, { knownTracks: savedTracks, signal: controller.signal, onExpandedArtists: artists => {
+      void searchRetrieval(trimmed, 60, library.searchCatalogRecords, { knownTracks: savedTracks, signal: controller.signal, onExpandedArtists: artists => {
         expandedArtists = artists;
         if (!cancelled) setMatches(current => ({ query: trimmed, tracks: [], albums: [], error: "", warning: "", ...(current?.query === trimmed ? current : {}), artists: [...new Map([...artists, ...(current?.query === trimmed ? current.artists : [])].map(artist => [artist.id, artist])).values()].slice(0, 3) }));
-      } }).then(tracks => update({ tracks: tracks.slice(0, 5) }), () => update({ warning: "Some suggestions could not be loaded." }));
+      } }).then(tracks => update({ tracks }), () => update({ warning: "Some suggestions could not be loaded." }));
       void library.searchCatalogEntities(trimmed).then(entities => update({ artists: [...new Map([...expandedArtists, ...entities.artists].map(artist => [artist.id, artist])).values()].slice(0, 3), albums: entities.albums.slice(0, 3), warning: entities.warning || "" }), () => update({ warning: "Some suggestions could not be loaded." }));
     }, 300);
     return () => { cancelled = true; controller.abort(); window.clearTimeout(timer); };
@@ -116,7 +117,7 @@ export function TopBarSearch({
   const options: SearchOption[] = [
     { key: "search", title: `Search for “${trimmed}”`, subtitle: "View all results", select: () => onSubmit?.() },
     ...(current?.artists ?? []).map(artist => ({ key: `artist:${artist.id}`, title: artist.name, subtitle: "Artist", artwork: artist.artworkUrl, select: () => onSelectArtist?.(artist.id) })),
-    ...(current?.tracks ?? []).map(track => ({ key: `song:${track.id}`, title: track.title, subtitle: `Song · ${track.artist}`, artwork: track.artworkUrl, track, select: () => onSelectTrack?.(track) })),
+    ...groupRecordings(current?.tracks ?? [], savedTracks, favorites).slice(0, 5).map(({ primary: track }) => ({ key: `song:${track.id}`, title: track.title, subtitle: `Song · ${track.artist}`, artwork: track.artworkUrl, track, select: () => onSelectTrack?.(track) })),
     ...(current?.albums ?? []).map(album => ({ key: `album:${album.id}`, title: album.title, subtitle: `Album · ${album.artist}`, artwork: album.artworkUrl, select: () => onSelectAlbum?.(album.id) })),
   ];
   useEffect(() => {

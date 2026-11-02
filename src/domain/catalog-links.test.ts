@@ -6,11 +6,11 @@ describe("catalog navigation references", () => {
     expect(canonicalArtistCredit("Emiway, Guest")).toBe("Emiway Bantai, Guest");
     expect(canonicalArtistCredit("EMIWAY BANTAI")).toBe("Emiway Bantai");
     expect(canonicalArtistCredit("Emiway Tribute")).toBe("Emiway Tribute");
-    expect(artistCredits("Emiway")[0].name).toBe("Emiway Bantai");
-    expect(artistReference("Emiway")).toBe("saavn:artist:name:Emiway%20Bantai");
+    expect(artistCredits("Emiway")[0].name).toBe("Emiway");
+    expect(artistReference("Emiway")).toBe("saavn:artist:name:Emiway");
   });
   it("keeps individual collaboration credits and escapes locator delimiters", () => {
-    expect(artistCredits('Kr$na')[0]).toEqual({ name: 'KR$NA', id: 'saavn:artist:name:KR%24NA' });
+    expect(artistCredits('Kr$na')[0]).toEqual({ name: 'Kr$na', id: 'saavn:artist:name:Kr%24na' });
     expect(artistCredits("KR$NA, Seedhe Maut").map(credit => credit.name)).toEqual(["KR$NA", "Seedhe Maut"]);
     expect(artistCredits("Bayaan, Hasan Raheem & Rovalio").map(credit => credit.name)).toEqual(["Bayaan", "Hasan Raheem", "Rovalio"]);
     expect(artistCredits("R&B")[0].name).toBe("R&B");

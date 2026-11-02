@@ -1,0 +1,54 @@
+{
+  "description": "Constructed regression for the observed Anirudh top-ten mismatch; recording rows are test metadata, not a captured provider response.",
+  "name": "Anirudh Ravichander",
+  "saavn": "saavn:artist:455663",
+  "apple": "itunes:480976476",
+  "saavnTopTen": [
+    "New release 0",
+    "New release 1",
+    "New release 2",
+    "New release 3",
+    "New release 4",
+    "New release 5",
+    "New release 6",
+    "New release 7",
+    "New release 8",
+    "New release 9"
+  ],
+  "appleTopTen": [
+    "Older hit 0",
+    "Older hit 1",
+    "Older hit 2",
+    "Older hit 3",
+    "Older hit 4",
+    "Older hit 5",
+    "Older hit 6",
+    "Older hit 7",
+    "Older hit 8",
+    "Older hit 9"
+  ],
+  "shared": [
+    {
+      "title": "Hukum",
+      "release": "Jailer",
+      "duration": 207,
+      "guests": []
+    },
+    {
+      "title": "Vaathi Coming",
+      "release": "Master",
+      "duration": 228,
+      "guests": [
+        "Gana Balachandar"
+      ]
+    },
+    {
+      "title": "Arabic Kuthu",
+      "release": "Beast",
+      "duration": 279,
+      "guests": [
+        "Jonita Gandhi"
+      ]
+    }
+  ]
+}

@@ -14,7 +14,7 @@ vi.mock('react', async original => ({
     if (!old || dependencies.some((d,i)=>!Object.is(d,old[i]))) { hooks.slots[n] = dependencies; hooks.pending.push(run); }
   },
 }));
-const bridge = vi.hoisted(() => ({ exchange: vi.fn(), syncState: vi.fn(), favoritesSync: vi.fn(), fetch: vi.fn(), stopSharing: vi.fn(), flush: vi.fn(), pause: vi.fn(), stop: vi.fn(), load: vi.fn(), tick: () => {}, online: () => {} }));
+const bridge = vi.hoisted(() => ({ exchange: vi.fn(), syncState: vi.fn(), favoritesSync: vi.fn(), fetch: vi.fn(), rediscover: vi.fn(), stopSharing: vi.fn(), flush: vi.fn(), pause: vi.fn(), stop: vi.fn(), load: vi.fn(), tick: () => {}, online: () => {} }));
 vi.mock('../adapters/collections', () => ({ collections: bridge }));
 vi.mock('../adapters/native', () => ({ desktop: true }));
 vi.mock('../player/listening-service', () => ({ flushListening: async () => {}, reloadSyncedListening: async () => {} }));
@@ -37,7 +37,7 @@ beforeEach(() => {
   vi.stubGlobal('window',{setInterval:(fn:()=>void)=>{bridge.tick=fn;return 1;},addEventListener:(name:string,fn:()=>void)=>{if(name==='online')bridge.online=fn;},removeEventListener:vi.fn()});
   vi.stubGlobal('localStorage',{getItem:(key:string)=>key==='lumaire-paired-link'?'paired-link':null,removeItem:vi.fn()});
   bridge.syncState.mockResolvedValue({deviceId:'local',clock:0,revision:0,cells:[],historyEnabled:false});
-  bridge.fetch.mockResolvedValue({playlists:[],now:null});bridge.flush.mockResolvedValue(undefined);bridge.stopSharing.mockResolvedValue(undefined);
+  bridge.fetch.mockResolvedValue({playlists:[],now:null});bridge.rediscover.mockRejectedValue('device unavailable');bridge.flush.mockResolvedValue(undefined);bridge.stopSharing.mockResolvedValue(undefined);
 });
 afterEach(()=>{vi.unstubAllGlobals();vi.restoreAllMocks();});
 it('backs off repeated background failures, recovers once, and never changes playback', async () => {
@@ -48,6 +48,13 @@ it('backs off repeated background failures, recovers once, and never changes pla
   vi.mocked(Date.now).mockReturnValue(115000);bridge.tick();await settle();expect(bridge.exchange).toHaveBeenCalledTimes(3);
   expect(api.error).toBe('');expect(api.lastSyncedAt).toBe(115000);
   expect(bridge.pause).not.toHaveBeenCalled();expect(bridge.stop).not.toHaveBeenCalled();expect(bridge.load).not.toHaveBeenCalled();
+});
+it('rediscovers and persists the paired host after an authenticated sync connection fails', async () => {
+  bridge.exchange.mockRejectedValueOnce('Cannot reach paired device');
+  bridge.rediscover.mockResolvedValue('http://192.168.1.20:4321/#credential');
+  render(); await settle();
+  expect(bridge.rediscover).toHaveBeenCalledWith('paired-link');
+  expect(api.guestLink).toBe('http://192.168.1.20:4321/#credential');
 });
 it('lets manual retries bypass backoff and clears the old error on success', async () => {
   bridge.exchange.mockRejectedValueOnce('Cannot reach paired device').mockResolvedValue(false);

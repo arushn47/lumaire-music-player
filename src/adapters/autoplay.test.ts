@@ -5,6 +5,18 @@ import { loadAutoplayPool } from './autoplay';
 import { catalogQuickPick } from '../domain/quick-picks';
 const song = (id: string): CatalogTrack => ({ id: `itunes:${id}`, title: id, artist: id, artists: [], album: id, duration: 180, language: 'tamil' });
 afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
+it('lets the native service own the deadline while awaiting recommendations', async () => {
+  vi.useFakeTimers();
+  const anchor = catalogQuickPick(song('987')).track;
+  vi.mocked(library.lookupCatalog).mockResolvedValue(song('987'));
+  let finish!: (tracks: CatalogTrack[]) => void;
+  vi.mocked(library.recommendCatalog).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+  const pending = loadAutoplayPool(anchor, () => true, 0);
+  await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+  expect(vi.getTimerCount()).toBe(0);
+  finish([song('988')]);
+  expect((await pending).candidates.map(item => item.track.id)).toEqual(['itunes:988']);
+});
 it('recovers Apple tracks lacking language through an exact same-recording catalog match', async () => {
   const original = song('931'), match = {...original, id: 'saavn:abcd1234'};
   vi.mocked(library.lookupCatalog).mockResolvedValue({...original, language: null});

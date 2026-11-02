@@ -115,7 +115,7 @@ try {
   for(const label of ['Recently Played','Continue Listening','Quick Picks','Your Rotation','Forgotten Favorites']) assert(await page.getByRole('region',{name:label,exact:true}).isVisible());
   await page.locator('.mobile-tab-bar').getByRole('button',{name:'Discover',exact:true}).click();
   const moodCover=page.locator('.explore-card-img').first();
-  await moodCover.scrollIntoViewIfNeeded();
+  if (await moodCover.isVisible()) await moodCover.scrollIntoViewIfNeeded();
   await page.waitForFunction(()=>{const image=document.querySelector('.explore-card-img');return image?.hidden||(image?.complete&&image.naturalWidth>0)});
   await page.screenshot({path:'.test-data/mobile-review/discover.png'});
   await page.goto(previewUrl+'/tests/mobile/index.html?search',{waitUntil:'domcontentloaded'});
@@ -131,22 +131,114 @@ try {
       oval: [...document.querySelectorAll('.mobile-header-btn,.transport .play-button,.track-menu summary')].some(n => { const r=n.getBoundingClientRect(); return r.width > 0 && (Math.abs(r.width-r.height)>1 || r.width<44); }) }));
     assert.deepEqual(problems, { overflow: false, oval: false });
   }
+  const rotationSizes = [[390,844],[844,390],[915,412],[1024,433],[800,1280],[1280,800],[1024,600],[640,800],[768,600],[900,500],[600,320],[320,568],[320,300],[390,844]];
+  for (const [width,height] of rotationSizes) {
+    await page.setViewportSize({width,height});
+    await page.locator('.mobile-tab-bar').waitFor();
+    const shell = await page.evaluate(() => {
+      const rect = selector => document.querySelector(selector).getBoundingClientRect().toJSON();
+      return {header:rect('.mobile-header'), workspace:rect('.workspace'), bar:rect('.mobile-tab-bar'), transport:rect('.transport'), overflow:document.documentElement.scrollWidth>innerWidth};
+    });
+    assert(!shell.overflow, `Shell overflow ${width}x${height}`);
+    assert(shell.header.width>=width-1&&shell.workspace.height>0&&shell.workspace.y>=shell.header.y+shell.header.height-1, `Shell placement ${width}x${height}: ${JSON.stringify(shell)}`);
+    assert(shell.transport.y>=shell.workspace.y+shell.workspace.height-1&&shell.bar.y>=shell.transport.y+shell.transport.height-1&&shell.bar.y+shell.bar.height<=height+1, `Shell rows ${width}x${height}: ${JSON.stringify(shell)}`);
+  }
+  await page.locator('.transport .mobile-cover-expand').click();
+  await page.locator('.mobile-now-playing').waitFor();
+  const playerHistory = await page.evaluate(()=>history.length);
+  for (const [width,height] of rotationSizes) {
+    await page.setViewportSize({width,height});
+    const wide=width>=900&&height>=600;
+    const player=page.locator(wide?'dialog.expanded-player[open]':'.mobile-now-playing');
+    await player.waitFor();
+    assert.equal(await page.evaluate(()=>history.length),playerHistory,'Rotation must retain one player history entry.');
+    const controls=player.getByRole('button',{name:'Play',exact:true});
+    await controls.scrollIntoViewIfNeeded();
+    const geometry=await player.evaluate(n=>({overflow:n.scrollWidth>n.clientWidth,rect:n.getBoundingClientRect().toJSON()}));
+    assert(!geometry.overflow, `Player overflow ${width}x${height}: ${JSON.stringify(geometry)}`);
+    const r=await controls.boundingBox();
+    assert(r&&r.x>=0&&r.y>=0&&r.x+r.width<=width+1&&r.y+r.height<=height+1, `Player control offscreen ${width}x${height}: ${JSON.stringify(r)}`);
+    if(height>=500||width>=600) {
+      const art=await player.locator(wide?'.expanded-cover-wrapper':'.mobile-np-artwork-card').boundingBox();
+      const identity=await player.locator(wide?'.now-playing':'.mobile-np-identity-row').boundingBox();
+      assert(art&&identity&&(art.x+art.width<=identity.x+1||art.y+art.height<=identity.y+1), `Artwork overlaps text ${width}x${height}: ${JSON.stringify({art,identity})}`);
+      assert(Math.abs(art.width-art.height)<2, `Artwork must remain square ${width}x${height}: ${JSON.stringify(art)}`);
+    }
+    if (wide) {
+      const record=await player.locator('.expanded-record').boundingBox();
+      const seek=await player.locator('.seek-bar-top').boundingBox();
+      assert(record&&seek&&record.y+record.height<=seek.y+1, `Song details overlap seek ${width}x${height}: ${JSON.stringify({record,seek})}`);
+      for (const label of ['Shuffle','Previous track','Next track','Close expanded player']) {
+        const button=await player.getByRole('button',{name:label,exact:true}).boundingBox();
+        assert(button&&button.width>=44&&button.height>=44, `Touch target too small: ${label}`);
+      }
+    }
+    await page.screenshot({path:`.test-data/mobile-review/rotation-${width}x${height}.png`});
+  }
+  await page.setViewportSize({width:1024,height:600});
+  await page.locator('dialog.expanded-player[open]').waitFor();
+  for (const theme of ['light','dark']) {
+    await page.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+    for (const layout of ['Minimal','Immersive']) {
+      await page.getByRole('button',{name:'Fullscreen layout',exact:true}).click();
+      await page.getByRole('option',{name:layout,exact:true}).click();
+      const details=await page.locator('.expanded-record').boundingBox(), buttons=await page.locator('.expanded-transport .player-center').boundingBox();
+      assert(details&&buttons&&details.y>=60&&buttons.y+buttons.height<=600, `Expanded ${theme} ${layout} must fit.`);
+      assert.equal(await page.evaluate(()=>history.length),playerHistory);
+      await page.screenshot({path:`.test-data/mobile-review/tablet-${theme}-${layout.toLowerCase()}.png`});
+    }
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.locator('.mobile-now-playing').waitFor();
+  await page.goBack();
+  await page.locator('.mobile-now-playing').waitFor({state:'detached'});
+  await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:false});
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.waitForFunction(() => !document.querySelector('.app')?.classList.contains('android'));
   assert(!await page.locator('.mobile-library-navigation').isVisible());
   assert(!await page.locator('.mobile-tab-bar').isVisible());
   assert(await page.locator('.desktop-sidebar').isVisible());
-  await page.locator('.queue-pane .queue-drag-handle').first().waitFor();
-  const handles=page.locator('.queue-pane .queue-drag-handle');
+  await page.locator('.queue-pane [data-queue-entry]').first().waitFor();
+  const handles=page.locator('.queue-pane [data-queue-entry]');
   const from=await handles.first().boundingBox(),to=await handles.last().boundingBox();
   assert(from&&to);
   await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();
   await page.mouse.move(to.x+to.width/2,to.y+to.height/2,{steps:8});await page.mouse.up();
   assert.deepEqual(await page.evaluate(()=>window.fixtureQueue),['t1','t3','t2']);
-  await handles.last().press('ArrowUp');
+  await handles.last().getByRole('button',{name:/Play queued/}).press('Alt+ArrowUp');
   assert.deepEqual(await page.evaluate(()=>window.fixtureQueue),['t1','t2','t3']);
+  await page.locator('.transport .mobile-cover-expand').click();
+  const expandedPlayer=page.locator('dialog.expanded-player[open]');
+  const progress=expandedPlayer.locator('.seek-bar-top');
+  const progressOpacity=()=>progress.evaluate(n=>Number(getComputedStyle(n).opacity));
+  await expandedPlayer.getByRole('button',{name:'Play',exact:true}).click();
+  await page.mouse.move(1100,100);
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.expanded-player .seek-bar-top')).opacity==='0');
+  assert.equal(await expandedPlayer.locator('.expanded-times').evaluate(n=>getComputedStyle(n).opacity),'0');
+  await page.mouse.move(1101,100);
+  await page.waitForFunction(()=>getComputedStyle(document.querySelector('.expanded-player .seek-bar-top')).opacity==='1');
+  await expandedPlayer.getByRole('slider',{name:'Seek playback',exact:true}).focus();
+  await page.waitForTimeout(3300);
+  assert.equal(await progressOpacity(),1,'Keyboard focus must keep progress visible.');
+  await expandedPlayer.getByRole('button',{name:'Pause',exact:true}).click();
+  await page.mouse.move(1100,100);
+  await page.waitForTimeout(3300);
+  assert.equal(await progressOpacity(),1,'Paused progress must remain visible.');
+  await expandedPlayer.getByRole('button',{name:'Fullscreen layout',exact:true}).click();
+  await page.getByRole('option',{name:'Minimal',exact:true}).click();
+  await expandedPlayer.getByRole('button',{name:'Play',exact:true}).click();
+  await page.mouse.move(1100,100);
+  await page.waitForTimeout(3300);
+  assert.equal(await progressOpacity(),1,'Minimal progress must remain visible.');
+  await cdp.send('Emulation.setTouchEmulationEnabled',{enabled:true,maxTouchPoints:1});
+  await expandedPlayer.getByRole('button',{name:'Fullscreen layout',exact:true}).click();
+  await page.getByRole('option',{name:'Immersive',exact:true}).click();
+  await page.waitForTimeout(3300);
+  assert.equal(await progressOpacity(),1,'Touch progress must remain visible.');
+  await page.goBack();
+  await expandedPlayer.waitFor({state:'detached'});
   assert.deepEqual(errors, []);
-  writeFileSync('.test-data/mobile-review/result.json', JSON.stringify({ passed: true, widths: [360, 390, 433, 1280], errors }, null, 2));
+  writeFileSync('.test-data/mobile-review/result.json', JSON.stringify({ passed: true, widths: [360, 390, 433, 1280], rotationSizes, errors }, null, 2));
   console.log('Passed: navigation, library filters, bottom sheets, player history, queue, lyrics, settings, circles, overflow and desktop isolation.');
 } catch (error) {
   console.error(error.message, errors);

@@ -8,7 +8,15 @@ if (enabled) {
     apply plugin: 'com.chaquo.python'
     def repo = runtimeRoot.parentFile.parentFile
     def cache = new File(repo, '.tools/android-streaming')
+    def preparePolicy = tasks.register('prepareBackgroundPolicy', Exec) {
+        workingDir repo
+        commandLine 'node', 'scripts/android-background-policy.mjs'
+        inputs.files(fileTree(new File(repo, 'src/domain')), fileTree(new File(repo, 'src/adapters')), fileTree(new File(repo, 'src/player')), new File(repo, 'scripts/android-background-policy.mjs'), fileTree(new File(runtimeRoot, 'policy')))
+        outputs.file new File(repo, 'src-tauri/gen/android/app/build/generated/background-policy/background-policy.mjs')
+    }
     def prepareRuntime = tasks.register('prepareStreamingRuntime', Sync) {
+        dependsOn preparePolicy
+        from(new File(repo, 'src-tauri/gen/android/app/build/generated/background-policy')) { into 'assets' }
         from(cache) { include 'yt_dlp-2026.8.19-py3-none-any.whl', 'yt_dlp_ejs-0.8.0-py3-none-any.whl'; into 'assets/python-wheels' }
         from(new File(cache, 'qjs-build/qjs')) { into 'jniLibs/arm64-v8a'; rename { 'libqjs.so' } }
         from(new File(repo, 'THIRD_PARTY_LICENSES.txt')) { into 'assets/licenses' }

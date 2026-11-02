@@ -14,7 +14,7 @@ import {
 import { IconButton } from "./IconButton";
 import { TopBarSearch, type TopBarSearchProps } from "./TopBarSearch";
 
-export interface TopBarProps extends Pick<TopBarSearchProps, "onSelectArtist" | "onSelectAlbum" | "onSelectTrack"> {
+export interface TopBarProps extends Pick<TopBarSearchProps, "onSelectArtist" | "onSelectAlbum" | "onSelectTrack" | "onCatalogAction" | "favorites" | "savedTracks"> {
   windowControls?: ReactNode;
   view: string;
   heading: string;
@@ -30,6 +30,7 @@ export interface TopBarProps extends Pick<TopBarSearchProps, "onSelectArtist" | 
   updateLabel?: string;
   onOpenConnect?: () => void;
   nearbySharing?: boolean;
+  nearbyConnected?: boolean;
   nearbyFollowing?: boolean;
   onStopFollowing?: () => void;
   canGoBack?: boolean;
@@ -58,6 +59,7 @@ export function TopBar({
   updateLabel,
   onOpenConnect,
   nearbySharing,
+  nearbyConnected,
   nearbyFollowing,
   onStopFollowing,
   canGoBack = false,
@@ -71,6 +73,9 @@ export function TopBar({
   onSelectArtist,
   onSelectAlbum,
   onSelectTrack,
+  onCatalogAction,
+  favorites,
+  savedTracks,
 }: TopBarProps) {
   const handleSync = onOpenSync || onOpenCollectionHub || onOpenImport || onOpenConnect;
 
@@ -110,7 +115,8 @@ export function TopBar({
 
       <div className={`topbar-center${queueOpen ? " queue-open" : ""}`} data-tauri-drag-region={windowControls ? true : undefined}>
         <TopBarSearch query={searchQuery} onChange={onSearchChange} onFocus={onSearchFocus}
-          onSubmit={onSearchSubmit} onSelectArtist={onSelectArtist} onSelectAlbum={onSelectAlbum} onSelectTrack={onSelectTrack} />
+          onSubmit={onSearchSubmit} onSelectArtist={onSelectArtist} onSelectAlbum={onSelectAlbum} onSelectTrack={onSelectTrack}
+          onCatalogAction={onCatalogAction} favorites={favorites} savedTracks={savedTracks} />
       </div>
 
       <div className="topbar-actions" data-tauri-drag-region={windowControls ? true : undefined}>
@@ -135,7 +141,7 @@ export function TopBar({
             title="Sharing on your Wi-Fi (Click to manage)"
           >
             <Wifi size={13} />
-            <span>Sharing on Wi-Fi</span>
+            <span>{nearbyConnected ? "Connected on Wi-Fi" : "Sharing on Wi-Fi"}</span>
           </button>
         )}
         {handleSync && !nearbySharing && (

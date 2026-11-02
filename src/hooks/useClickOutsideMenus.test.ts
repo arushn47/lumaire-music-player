@@ -128,4 +128,62 @@ describe("initClickOutsideMenus", () => {
     listeners.keydown({ key: "Escape" } as KeyboardEvent);
     expect(mockDetails.open).toBe(false);
   });
+
+  it("opens context menu at mouse coordinates on right click", () => {
+    const listeners: Record<string, EventListener> = {};
+    const popover = { style: { position: "", left: "", top: "" }, getBoundingClientRect: () => ({ width: 200, height: 200 }) };
+    const menu = { open: false, querySelector: (s: string) => s === ".menu-popover" ? popover : null };
+    const item = { querySelector: () => menu };
+    const target = { closest: (selector: string) => selector === ".track-row" ? null : selector === ".recent-track-item" ? item : null };
+    const doc = {
+      addEventListener: vi.fn((name, listener) => { listeners[name] = listener; }),
+      removeEventListener: vi.fn(),
+      querySelectorAll: () => [],
+      defaultView: { matchMedia: () => ({ matches: false }), addEventListener: vi.fn(), removeEventListener: vi.fn() },
+    } as unknown as Document;
+    const cleanup = initClickOutsideMenus(doc);
+    const event = { target, clientX: 100, clientY: 150, preventDefault: vi.fn() } as unknown as MouseEvent;
+    listeners.contextmenu(event);
+    expect(event.preventDefault).toHaveBeenCalled();
+    expect(menu.open).toBe(true);
+    expect(popover.style.position).toBe("fixed");
+    expect(popover.style.left).toBe("100px");
+    expect(popover.style.top).toBe("150px");
+    cleanup();
+  });
+
+  it("suppresses browser menu in search dropdown and opens menu on search option", () => {
+    const listeners: Record<string, EventListener> = {};
+    const popover = { style: { position: "", left: "", top: "" }, getBoundingClientRect: () => ({ width: 180, height: 150 }) };
+    const menu = { open: false, querySelector: (s: string) => s === ".menu-popover" ? popover : null };
+    const searchOption = { querySelector: () => menu };
+    const targetInOption = {
+      closest: (selector: string) => selector === ".topbar-search-option" ? searchOption : selector === ".topbar-search-dropdown" ? true : null,
+    };
+    const targetInDropdownOnly = {
+      closest: (selector: string) => selector === ".topbar-search-dropdown" ? true : null,
+    };
+    const doc = {
+      addEventListener: vi.fn((name, listener) => { listeners[name] = listener; }),
+      removeEventListener: vi.fn(),
+      querySelectorAll: () => [],
+      defaultView: { matchMedia: () => ({ matches: false }), addEventListener: vi.fn(), removeEventListener: vi.fn() },
+    } as unknown as Document;
+    const cleanup = initClickOutsideMenus(doc);
+
+    // 1. Target in dropdown but not on a menu item: suppresses browser contextmenu
+    const emptyEvent = { target: targetInDropdownOnly, clientX: 50, clientY: 50, preventDefault: vi.fn() } as unknown as MouseEvent;
+    listeners.contextmenu(emptyEvent);
+    expect(emptyEvent.preventDefault).toHaveBeenCalled();
+
+    // 2. Target on search option: opens track menu at coordinates
+    const optionEvent = { target: targetInOption, clientX: 200, clientY: 300, preventDefault: vi.fn() } as unknown as MouseEvent;
+    listeners.contextmenu(optionEvent);
+    expect(optionEvent.preventDefault).toHaveBeenCalled();
+    expect(menu.open).toBe(true);
+    expect(popover.style.position).toBe("fixed");
+    expect(popover.style.left).toBe("200px");
+    expect(popover.style.top).toBe("300px");
+    cleanup();
+  });
 });

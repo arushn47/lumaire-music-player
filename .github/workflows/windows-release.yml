@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   release:
-    if: github.repository == 'arushn47/music-player'
+    if: github.repository == 'arushn47/lumaire-music-player'
     runs-on: windows-2022
     timeout-minutes: 60
     permissions:
@@ -123,7 +123,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $checkDir = Join-Path $env:RUNNER_TEMP 'lumaire-release-check'
-          gh release download $env:RELEASE_TAG --repo arushn47/music-player --dir $checkDir
+          gh release download $env:RELEASE_TAG --repo arushn47/lumaire-music-player --dir $checkDir
           if ($LASTEXITCODE -ne 0) { throw 'Failed to retrieve draft release assets.' }
           node scripts/check-windows-release.mjs --artifacts $checkDir
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

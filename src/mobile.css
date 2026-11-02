@@ -1,6 +1,6 @@
 .mobile-library-navigation, .mobile-settings-back, .mobile-settings-chevron, .menu-popover .mobile-actions-close, .mobile-track-favorite { display: none; }
 
-@media (max-width: 768px) {
+@media (max-width: 768px), (max-height: 599px), (pointer: coarse) {
   #root .app {
     grid-template-rows: 56px minmax(0, 1fr) auto calc(56px + env(safe-area-inset-bottom, 0px)) !important;
     padding-bottom: 0;
@@ -191,8 +191,18 @@
   .app.android .recent-track-art {
     width: 100% !important;
     height: 100% !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px;
+  }
+  #root .app .recent-track-art > img,
+  .app.android .recent-track-art > img {
+    width: 100%;
+    height: 100%;
     border-radius: 8px;
     object-fit: cover;
+    display: block;
   }
   #root .app .recent-track-play-badge,
   .app.android .recent-track-play-badge {
@@ -229,7 +239,8 @@
     gap: 4px;
   }
 
-  #root .app .mobile-library-navigation { display: block; margin-bottom: 18px; }
+  #root .app .mobile-library-navigation,
+  .app.android .mobile-library-navigation { display: block; margin-bottom: 18px; }
   #root .app .mobile-library-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
   #root .app .mobile-library-heading h1 { margin: 0; }
   #root .app .mobile-library-filters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 2px 0 6px; }
@@ -237,6 +248,7 @@
   #root .app .mobile-library-filters [aria-current="page"] { background: var(--accent-subtle); color: var(--accent); border-color: var(--line-accent); }
   #root .app .mobile-library-shortcuts { display: flex; gap: 18px; margin-top: 8px; }
   #root .app .mobile-library-shortcuts button { display: flex; align-items: center; gap: 7px; min-height: 44px; padding: 0; color: var(--muted); font-size: 12px; }
+  #root .app .library-filter-chips { display: none; }
   #root .app .library-root-heading > div:first-child { display: none; }
   #root .app .library-root-heading { margin-bottom: 16px; }
   #root .app .library-root-heading .heading-actions { justify-content: flex-start; flex-wrap: wrap; }
@@ -246,7 +258,7 @@
   #root .app .mobile-library-songs h1 { font: 600 16px/1.4 var(--font-sans); }
   #root .app .mobile-library-songs .eyebrow { display: none; }
   #root .app .collection-grid { display: flex; flex-direction: column; gap: 4px; border: 0; padding: 0; }
-  #root .app .collection-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 8px 0; border: 0; background: transparent; border-radius: 10px; box-shadow: none; }
+  #root .app .collection-card { display: flex; flex-direction: row; align-items: center; gap: 14px; padding: 8px 12px; border: 0; background: transparent; border-radius: 10px; box-shadow: none; }
   #root .app .collection-art-wrap { flex: 0 0 60px; width: 60px; height: 60px; margin: 0; }
   #root .app .collection-art { width: 60px; height: 60px; border-radius: 10px; }
   #root .app .collection-info { flex: 1; min-width: 0; padding: 0; text-align: left; }
@@ -259,17 +271,18 @@
   #root .app .collection-header .collection-cover { align-self: center; width: min(52vw, 210px); height: auto; aspect-ratio: 1; }
   #root .app .album-actions { gap: 8px; flex-wrap: wrap; }
   #root .app :is(.track-header, .catalog-tracks .track-header) { display: none; }
-  #root .app :is(.track-row, .catalog-tracks .track-row) { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; min-height: 68px; padding: 8px 0; border-radius: 10px; }
+  #root .app :is(.track-row, .catalog-tracks .track-row) { grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; min-height: 68px; padding: 8px 12px; border-radius: 10px; cursor: pointer; }
   #root .app .track-row > :is(.track-play, .duration, .album) { display: none; }
   #root .app .track-meta { grid-column: 1; grid-row: 1; gap: 12px; min-width: 0; }
-  #root .app .track-meta .cover { width: 48px; height: 48px; flex-shrink: 0; border-radius: 8px; }
+  #root .app .track-meta .cover { width: 48px; height: 48px; flex-shrink: 0; border-radius: 8px; cursor: pointer; }
   #root .app .track-title-button { font-size: 15px; line-height: 1.4; text-align: start; }
   #root .app .track-meta-text small { font-size: 12px; line-height: 1.5; }
   #root .app .track-actions { grid-column: 2; grid-row: 1; gap: 0; }
   #root .app .track-row > :is(.album, .duration, .track-play) { display: none !important; }
   #root .app .track-actions > .icon-button { display: none; }
   #root .app .catalog-fav-menu-btn { display: flex; }
-  #root .app .track-row { -webkit-user-select: none; user-select: none; }
+  #root .app .track-row { -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  #root .app .track-row:active { background: var(--bg-panel-hover); }
 
   #root .app details.track-menu[open] { z-index: 1600; }
   #root .app details.track-menu[open]::before { content: ""; position: fixed; inset: 0; z-index: -1; background: #0009; backdrop-filter: none; }
@@ -328,15 +341,16 @@
   #root .app .mobile-np-scrim { background: linear-gradient(180deg, transparent, color-mix(in srgb, var(--bg) 75%, transparent)); }
   #root .app .mobile-np-drag-zone { height: calc(16px + env(safe-area-inset-top, 0px)); padding-top: env(safe-area-inset-top, 0px); flex-shrink: 0; }
   #root .app .mobile-np-header { padding: 0 12px 8px; gap: 12px; touch-action: none; flex-shrink: 0; }
+  #root .app .mobile-np-header:has(details.track-menu[open]) { z-index: 1601; }
   #root .app .mobile-np-context { flex: 1; min-width: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 0; }
   #root .app .mobile-np-context span { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
   #root .app .mobile-np-context small { display: block; max-width: 100%; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   #root .app .mobile-np-segmented-tabs { padding: 2px; backdrop-filter: none; }
   #root .app .mobile-np-tab { min-height: 44px; padding: 8px 10px; font-size: 13px; transition: color 120ms, background 120ms; }
   @media (max-width: 400px) { #root .app .mobile-np-tab svg { display: none; } }
-  #root .app .mobile-np-main-view { padding: 16px 20px 28px; gap: 6px; min-height: 0; }
+  #root .app .mobile-np-main-view { padding: 16px 20px 28px; gap: 6px; min-height: 0; overflow-y: auto; touch-action: pan-y; }
   #root .app .mobile-np-artwork-container { padding: 0; }
-  #root .app .mobile-np-artwork-card { width: min(calc(100vw - 40px), calc(100dvh - 340px), 430px); max-height: none; flex-shrink: 0; border-radius: 10px; box-shadow: 0 14px 38px #0003; transform: none; transition: none; touch-action: none; }
+  #root .app .mobile-np-artwork-card { width: min(100%, max(80px, calc(100dvh - 390px)), 430px); max-height: none; flex-shrink: 0; border-radius: 10px; box-shadow: 0 14px 38px #0003; transform: none; transition: none; touch-action: none; }
   #root .app .mobile-np-identity-row { margin: 0 0 2px; }
   #root .app .mobile-np-title { font-size: 23px; letter-spacing: -.025em; }
   #root .app .mobile-np-slider-wrap, #root .app .mobile-np-seek-slider { height: 44px; touch-action: none; }
@@ -517,3 +531,26 @@
   }
 }
 @keyframes mobile-actions-in { from { opacity: .5; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 768px), (max-height: 599px), (pointer: coarse) {
+  #root .app { padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); }
+  #root .app .mobile-now-playing { padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); }
+  #root .app .mobile-np-main-view > * { min-width: 0; flex-shrink: 0; }
+  #root .app .mobile-np-artwork-container { flex: 1 0 auto; }
+}
+
+/* Keep artwork beside the controls when window height is the limiting dimension. */
+@media (min-width: 600px) and (max-height: 599px) {
+  #root .app .mobile-np-main-view {
+    display: grid; grid-template-columns: minmax(100px, 35%) minmax(0, 1fr);
+    grid-template-rows: minmax(44px, 1fr) auto auto; align-items: center;
+    max-width: 960px; padding: 4px 24px 12px; gap: 0 24px;
+  }
+  #root .app .mobile-np-artwork-container { grid-column: 1; grid-row: 1 / 4; margin: 0; }
+  #root .app .mobile-np-artwork-card { width: min(100%, max(80px, calc(100dvh - 150px)), 280px); }
+  #root .app .mobile-np-identity-row,
+  #root .app .mobile-np-scrubber-section,
+  #root .app .mobile-np-transport-row { grid-column: 2; }
+  #root .app .mobile-np-title { font-size: 20px; }
+  #root .app .mobile-np-play-button { width: 56px; height: 56px; min-width: 56px; }
+}

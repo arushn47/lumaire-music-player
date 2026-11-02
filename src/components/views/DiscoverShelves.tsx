@@ -6,6 +6,7 @@ import { DISCOVERY_PREFERENCES_CHANGED, discoveryPreferences, discoveryTrendingI
 import type { DiscoverPage } from "../../adapters/native";
 import type { DiscoveryViewProps } from "./DiscoveryView";
 import { Artwork } from "../common";
+import {featuredAlbum} from '../../adapters/discovery-home';
 
 type Props = Pick<
   DiscoveryViewProps,
@@ -27,6 +28,13 @@ type Props = Pick<
 };
 
 export function DiscoverShelves(props: Props) {
+  const [spotlightDate,setSpotlightDate] = useState(()=>new Date());
+  useEffect(()=>{
+    const update=()=>setSpotlightDate(previous=>{const now=new Date();return previous.toDateString()===now.toDateString()?previous:now;});
+    const timer=window.setInterval(update,60000);
+    window.addEventListener('focus',update);
+    return ()=>{window.clearInterval(timer);window.removeEventListener('focus',update);};
+  },[]);
   const [feed, setFeed] = useState<DiscoverPage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -137,7 +145,7 @@ export function DiscoverShelves(props: Props) {
 
           {/* Featured Spotlight Hero Banner (Sonora / Apple Music Style) */}
           {feed.newAlbums.length > 0 && (() => {
-            const spotlightAlbum = feed.newAlbums[0];
+            const spotlightAlbum = featuredAlbum(feed.newAlbums,spotlightDate)!;
             return (
               <section aria-label="Featured album" className="discover-editorial-section discover-spotlight-section">
                 <div

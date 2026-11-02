@@ -40,13 +40,13 @@ export function EngineSetupCard({ engineState, engineError, engineProgress: prog
       </div>}
       {engineError && <p className="engine-install-error" role="alert">{engineError}</p>}
       {!installed && <details><summary>What gets installed?</summary>
-        <p>yt-dlp 2026.08.19 and QuickJS-NG 0.17.0, from their official GitHub releases. Downloads are verified and tested, then stored privately for Lumaire. No administrator access or system PATH changes.</p>
-        <a href="https://github.com/yt-dlp/yt-dlp/releases/tag/2026.08.19" target="_blank" rel="noreferrer">yt-dlp source & licences</a>{" · "}
-        <a href="https://github.com/quickjs-ng/quickjs/releases/tag/v0.17.0" target="_blank" rel="noreferrer">QuickJS source & MIT licence</a>
+        <p>yt-dlp and QuickJS from their official releases. Lumaire checks for stable engine updates automatically, verifies downloads and tests them before use. Components stay private to Lumaire; no administrator access is needed.</p>
+        <a href="https://github.com/yt-dlp/yt-dlp/releases" target="_blank" rel="noreferrer">yt-dlp source & licences</a>{" · "}
+        <a href="https://github.com/quickjs-ng/quickjs/releases" target="_blank" rel="noreferrer">QuickJS source & MIT licence</a>
       </details>}
     </div>
     <div className="engine-setup-actions">
-      <button className={installed ? "subtle" : "primary"} disabled={checking || installing || installed} onClick={() => void onInstallYoutubeEngine()}>
+      <button className={installed ? "subtle" : "primary engine-setup-action"} disabled={checking || installing || installed} onClick={() => void onInstallYoutubeEngine()}>
         {installed ? <Check size={16} aria-hidden="true" /> : checking || installing ? <LoaderCircle size={16} className="updater-spinner" aria-hidden="true" /> : <Download size={16} aria-hidden="true" />}
         {installed ? "Installed" : checking ? "Checking…" : installing ? "Setting up…" : engineState === "error" ? "Retry setup" : "Enable online playback"}
       </button>

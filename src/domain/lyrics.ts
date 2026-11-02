@@ -110,13 +110,19 @@ export function synchronizedLyrics(
   // Legacy cached documents may contain LRC from a different-duration edition.
   if (
     doc.source &&
-    (duration <= 0 || Math.abs(doc.source.duration - duration) > 2)
+    (!Number.isFinite(duration) || !Number.isFinite(doc.source.duration) || duration <= 0 || doc.source.duration <= 0 || Math.abs(doc.source.duration - duration) > 2)
   )
     return false;
   return !doc.lines.some(
     (line) =>
-      duration > 0 && ((line.time !== null && line.time > (duration + 2) * 1000) || line.words?.some(word => (word.end ?? word.time) > (duration + 2) * 1000)),
+      duration > 0 && ((line.time !== null && line.time + doc.fileOffset > (duration + 2) * 1000) || line.words?.some(word => (word.end ?? word.time) + doc.fileOffset > (duration + 2) * 1000)),
   );
+}
+
+export function lyricsVersionMatches(doc: LyricDocument, title: string): boolean {
+  if (!doc.source || doc.origin === 'imported') return true;
+  const labels=(value:string)=>[...new Set((value.match(/\b(?:live|remix|acoustic|instrumental|karaoke|cover|demo|remaster(?:ed)?|radio\s+edit|extended|slowed|sped\s+up|female|male)\b/gi)||[]).map(label=>label.toLowerCase()))].sort().join('|');
+  return labels(doc.source.title)===labels(title);
 }
 
 /** Approximate reading position only. Never assign timestamps or enable seeking. */

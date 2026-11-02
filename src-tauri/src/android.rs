@@ -109,6 +109,75 @@ fn validate_display_metadata(metadata: &DisplayMetadata) -> crate::Result<()> {
 }
 
 #[tauri::command]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub async fn android_background_queue(_app: tauri::AppHandle, queue: serde_json::Value, revision: u64) -> crate::Result<serde_json::Value> {
+    #[cfg(target_os = "android")]
+    {
+        let queue = prepare_background_queue(_app.clone(), queue, None).await?;
+        call(&_app, "backgroundQueue", serde_json::json!({"queue":queue,"revision":revision})).await
+    }
+    #[cfg(not(target_os = "android"))]
+    { let _ = (_app, queue, revision); Err("Background queue is available only on Android.".into()) }
+}
+
+#[cfg(target_os = "android")]
+async fn prepare_background_queue(app: tauri::AppHandle, mut queue: serde_json::Value, generation: Option<u64>) -> crate::Result<serde_json::Value> {
+    crate::validate_session(&queue["session"])?;
+    if queue.to_string().len() > 20 * 1024 * 1024 { return Err("Background queue is too large.".into()); }
+    let session = &queue["session"];
+    let entries = session["queue"].as_array().ok_or("Invalid queue.")?;
+    let mut seen = std::collections::HashSet::new();
+    for entry in entries {
+        let id = entry["id"].as_str().filter(|s| !s.is_empty() && s.len() <= 256).ok_or("Invalid queue occurrence.")?;
+        if !seen.insert(id) || entry["trackId"].as_str().is_none_or(|s| s.is_empty() || s.len() > 512) { return Err("Invalid queue identity.".into()); }
+    }
+    if !entries.iter().any(|entry| entry["id"] == session["currentId"]) { return Err("Choose a queued song first.".into()); }
+    let _: std::collections::HashMap<String, crate::Track> = serde_json::from_value(session["queueTracks"].clone()).map_err(crate::err)?;
+    let _: Vec<String> = serde_json::from_value(session["shuffleOrder"].clone()).map_err(crate::err)?;
+    if !matches!(session["settings"]["repeat"].as_str(), Some("off" | "one" | "all"))
+        || !session["settings"]["shuffle"].is_boolean() || !session["settings"]["autoplay"].is_boolean() { return Err("Invalid queue settings.".into()); }
+    if queue["languages"].as_array().is_none_or(|a| a.len() > 32 || a.iter().any(|v| v.as_str().is_none_or(|s| s.len() > 64))) { return Err("Invalid music preferences.".into()); }
+    let session = queue["session"].clone();
+    let (snapshot, history) = crate::work(app, move |_, db| {
+        if generation.is_some_and(|owner| LOAD_GENERATION.load(std::sync::atomic::Ordering::SeqCst) != owner) { return Err("Playback selection changed.".into()); }
+        let session = if generation.is_some() { session } else { crate::android_background::merge_session(session) };
+        crate::write_session(db, &session)?;
+        Ok((crate::snapshot(db)?, crate::listening::read(db)?))
+    }).await?;
+    queue["tracks"] = serde_json::to_value(snapshot.tracks).map_err(crate::err)?;
+    queue["records"] = serde_json::to_value(history.records).map_err(crate::err)?;
+    queue["listeningGeneration"] = history.generation.into();
+    if queue["listening"]["generation"].as_i64() != Some(history.generation) {
+        queue["listening"]["record"] = serde_json::Value::Null;
+        queue["listening"]["generation"] = history.generation.into();
+    }
+    // Documents stay in SQLite; the native worker needs only queue and recommendation context.
+    queue["session"]["lyrics"] = serde_json::json!({});
+    queue["session"]["playlists"] = serde_json::json!([]);
+    queue["session"].as_object_mut().unwrap().remove("replica");
+    Ok(queue)
+}
+
+#[tauri::command]
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub async fn android_background_start(_app: tauri::AppHandle, queue: serde_json::Value, autoplay: bool, position: f64) -> crate::Result<serde_json::Value> {
+    #[cfg(target_os = "android")]
+    {
+        use std::sync::atomic::Ordering;
+        if !position.is_finite() || position < 0.0 { return Err("Invalid playback position.".into()); }
+        let generation = LOAD_GENERATION.fetch_add(1, Ordering::SeqCst) + 1;
+        call(&_app, "invalidateQueue", serde_json::json!({})).await?;
+        if LOAD_GENERATION.load(Ordering::SeqCst) != generation { return Err("Playback selection changed.".into()); }
+        call(&_app, "cancelResolution", serde_json::json!({})).await?;
+        let queue = prepare_background_queue(_app.clone(), queue, Some(generation)).await?;
+        if LOAD_GENERATION.load(Ordering::SeqCst) != generation { return Err("Playback selection changed.".into()); }
+        call(&_app, "startBackgroundQueue", serde_json::json!({"queue":queue,"autoplay":autoplay,"position":position})).await
+    }
+    #[cfg(not(target_os = "android"))]
+    { let _ = (_app, queue, autoplay, position); Err("Background queue is available only on Android.".into()) }
+}
+
+#[tauri::command]
 pub async fn android_playback(
     _app: tauri::AppHandle,
     action: String,
@@ -124,6 +193,7 @@ pub async fn android_playback(
         let mut args = serde_json::json!({"action":action});
         match action.as_str() {
             "load" => {
+                call(&_app, "invalidateQueue", serde_json::json!({})).await?;
                 use std::sync::atomic::Ordering;
                 if let Some(metadata) = display_metadata.as_ref() {
                     validate_display_metadata(metadata)?;
@@ -152,12 +222,12 @@ pub async fn android_playback(
                 }
                 let mut online = serde_json::Value::Null;
                 let uri = if saved.as_ref().is_some_and(|(_, path)| path.is_some()) {
-                    let path = media_path(_app.clone(), id.clone()).await?;
+                    let path = crate::media_path_inner(_app.clone(), id.clone()).await?;
                     reqwest::Url::from_file_path(path)
                         .map_err(|_| "Invalid local audio path.")?
                         .to_string()
                 } else if let Some(source) = id.strip_prefix("wikimedia-commons:") {
-                    resolve_commons_audio(source.to_string()).await?.url
+                    crate::resolve_commons_audio_inner(source.to_string()).await?.url
                 } else if let Some(video) = id.strip_prefix("youtube:") {
                     validate_video_id(video)?;
                     online = call(
@@ -219,6 +289,7 @@ pub async fn android_playback(
                     .into();
             }
             "stop" => {
+                call(&_app, "invalidateQueue", serde_json::json!({})).await?;
                 LOAD_GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                 call(&_app, "cancelResolution", serde_json::json!({})).await?;
             }
@@ -297,8 +368,8 @@ pub async fn android_set_theme(
     }
 }
 
-#[cfg(any(target_os = "android", test))]
-fn validate_video_id(video: &str) -> crate::Result<()> {
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub(crate) fn validate_video_id(video: &str) -> crate::Result<()> {
     if video.len() == 11
         && video
             .bytes()
@@ -325,6 +396,10 @@ pub async fn android_source(
         let mut request = serde_json::json!({"operation":operation});
         match operation.as_str() {
             "probe" => {}
+            "debugMediaRefusal" => {
+                if !cfg!(debug_assertions) { return Err("Test transport is unavailable.".into()); }
+                return call(&_app, "debugMediaRefusal", serde_json::json!({})).await;
+            }
             "resolve" | "challenge" => {
                 let video = video_id.ok_or("Choose a video first.")?;
                 validate_video_id(&video)?;

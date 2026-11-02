@@ -3,6 +3,7 @@ use std::{io::{Read, Write}, net::{IpAddr, Ipv4Addr, TcpListener, TcpStream, Udp
 use crate::Track;
 use tauri::Manager;
 use rusqlite::OptionalExtension;
+use sha2::{Digest, Sha256};
 type SyncHandler<'a> = dyn Fn(&str, &[u8]) -> Result<Vec<u8>, String> + 'a;
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -18,6 +19,35 @@ struct Host { stop: Arc<AtomicBool>, data: Arc<Mutex<(SharedState, Instant)>>, w
 #[derive(Default)]
 pub struct Nearby(Mutex<Option<Host>>);
 const MAX: usize = 1_000_000;
+const DISCOVERY_PORT: u16 = 43127;
+
+fn mac(token: &str, message: &[u8]) -> [u8; 32] {
+    let mut key = [0u8; 64];
+    key[..token.len()].copy_from_slice(token.as_bytes());
+    let mut inner = [0x36u8; 64];
+    let mut outer = [0x5cu8; 64];
+    for i in 0..64 { inner[i] ^= key[i]; outer[i] ^= key[i]; }
+    let mut hash = Sha256::new(); hash.update(inner); hash.update(message);
+    let digest = hash.finalize();
+    let mut hash = Sha256::new(); hash.update(outer); hash.update(digest);
+    hash.finalize().into()
+}
+
+fn discover_response(token: &str, request: &[u8], port: u16, peer: Ipv4Addr) -> Option<[u8; 51]> {
+    if !private(peer) || request.len() != 49 || request[0] != 1 { return None; }
+    let expected = mac(token, &[b"lumaire-discovery-request-v1".as_slice(), &request[1..17]].concat());
+    if !constant_time_eq(&expected, &request[17..49]) { return None; }
+    let mut response = [0u8; 51];
+    response[0] = 2; response[1..17].copy_from_slice(&request[1..17]);
+    response[17..19].copy_from_slice(&port.to_be_bytes());
+    let proof = mac(token, &[b"lumaire-discovery-response-v1".as_slice(), &response[1..19]].concat());
+    response[19..].copy_from_slice(&proof);
+    Some(response)
+}
+
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    left.len() == right.len() && left.iter().zip(right).fold(0u8, |diff, (a, b)| diff | (a ^ b)) == 0
+}
 
 fn private(ip: Ipv4Addr) -> bool { ip.is_private() || ip.is_loopback() }
 pub(crate) fn clean_track(track: &mut Track) -> Result<(), String> {
@@ -31,6 +61,9 @@ pub(crate) fn clean_track(track: &mut Track) -> Result<(), String> {
         let commons = source.provider_id == "wikimedia-commons" && source.source_id.parse::<u64>().is_ok_and(|id| id > 0);
         if (!youtube && !commons) || track.id != format!("{}:{}", source.provider_id, source.source_id) { return Err("Invalid shared source identity.".into()) }
         source.page_url = if youtube { format!("https://www.youtube.com/watch?v={}", source.source_id) } else { format!("https://commons.wikimedia.org/?curid={}", source.source_id) };
+    }
+    if track.recording_metadata.as_ref().is_some_and(|metadata| !metadata.valid()) {
+        track.recording_metadata = None;
     }
     track.file_name.clear(); track.offline = false; track.missing = false;
     track.artwork_url = track.artwork_url.take().filter(|url| url.len() <= 4000 && url.starts_with("https://"));
@@ -97,6 +130,8 @@ pub fn nearby_start(app: tauri::AppHandle, state: tauri::State<'_, Nearby>) -> R
     let listener = TcpListener::bind((Ipv4Addr::UNSPECIFIED, credentials.as_ref().map(|c|c.0).unwrap_or(0))).map_err(|_| "Could not reopen the sync port. Close other Lumaire sharing sessions and retry.")?;
     let port = listener.local_addr().map_err(|e| e.to_string())?.port();
     listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+    let discovery = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, DISCOVERY_PORT)).map_err(|_| "Could not open the authenticated nearby discovery port.")?;
+    discovery.set_nonblocking(true).map_err(|e| e.to_string())?;
     let token = credentials.map(|c|c.1).unwrap_or_else(||uuid::Uuid::new_v4().simple().to_string());
     {
         let store=app.state::<crate::Store>();let db=store.0.lock().map_err(crate::err)?;
@@ -106,7 +141,15 @@ pub fn nearby_start(app: tauri::AppHandle, state: tauri::State<'_, Nearby>) -> R
     let stop = Arc::new(AtomicBool::new(false)); let data = Arc::new(Mutex::new((SharedState::default(), Instant::now())));
     let thread_stop = stop.clone(); let thread_data = data.clone();
     let worker = std::thread::spawn(move || {
+        let mut packet = [0u8; 128];
         while !thread_stop.load(Ordering::Relaxed) {
+            if let Ok((length, source)) = discovery.recv_from(&mut packet) {
+                if let IpAddr::V4(peer) = source.ip() {
+                    if let Some(response) = discover_response(&token, &packet[..length], port, peer) {
+                        let _ = discovery.send_to(&response, source);
+                    }
+                }
+            }
             match listener.accept() {
                 Ok((stream, peer)) if matches!(peer.ip(), IpAddr::V4(ip) if private(ip)) => serve(stream, &token, &thread_data, &thread_stop, Some(&|path,body| {
                     let store=app.state::<crate::Store>();
@@ -126,7 +169,12 @@ pub fn nearby_stop(app: tauri::AppHandle, state: tauri::State<'_, Nearby>, forge
         host.stop.store(true, Ordering::Relaxed);
         host.worker.join().map_err(|_| "Nearby listener did not shut down cleanly.")?;
     }
-    if forget.unwrap_or(false) { let store=app.state::<crate::Store>();let db=store.0.lock().map_err(crate::err)?;db.execute("DELETE FROM sync_host",[]).map_err(crate::err)?; }
+    if forget.unwrap_or(false) {
+        let store = app.state::<crate::Store>();
+        let db = store.0.lock().map_err(crate::err)?;
+        db.execute("DELETE FROM sync_host", []).map_err(crate::err)?;
+        let _ = db.execute("DELETE FROM sync_peer_info", []);
+    }
     Ok(())
 }
 #[tauri::command]
@@ -144,6 +192,32 @@ fn destination(link: &str) -> Result<(reqwest::Url, String), String> {
     if url.scheme() != "http" || url.port().is_none() || !url.username().is_empty() || url.password().is_some() || url.path() != "/" || url.query().is_some() || ip.is_unspecified() { return Err("Invalid nearby pairing link.".into()) }
     url.set_fragment(None); url.set_path("/v1/state"); Ok((url, token))
 }
+
+#[tauri::command]
+pub async fn nearby_rediscover(link: String) -> Result<String, String> {
+    let (url, token) = destination(&link)?;
+    let port = url.port().ok_or("Invalid nearby pairing link.")?;
+    let token_for_worker = token.clone();
+    tokio::task::spawn_blocking(move || {
+        let socket = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).map_err(|_| "Nearby discovery could not start.")?;
+        socket.set_broadcast(true).map_err(|_| "Nearby broadcast is unavailable on this network.")?;
+        socket.set_read_timeout(Some(Duration::from_millis(800))).map_err(crate::err)?;
+        let nonce = *uuid::Uuid::new_v4().as_bytes();
+        let proof = mac(&token_for_worker, &[b"lumaire-discovery-request-v1".as_slice(), &nonce].concat());
+        let mut request = [0u8; 49]; request[0] = 1; request[1..17].copy_from_slice(&nonce); request[17..].copy_from_slice(&proof);
+        socket.send_to(&request, (Ipv4Addr::BROADCAST, DISCOVERY_PORT)).map_err(|_| "Nearby discovery could not reach this Wi-Fi network.")?;
+        let mut response = [0u8; 128];
+        let (length, source) = socket.recv_from(&mut response).map_err(|_| "The paired device was not found on this Wi-Fi network.")?;
+        let IpAddr::V4(ip) = source.ip() else { return Err("The paired device returned an invalid address.".into()) };
+        if !private(ip) || length != 51 || response[0] != 2 || response[1..17] != nonce { return Err("The paired device returned an invalid discovery response.".into()) }
+        let new_port = u16::from_be_bytes([response[17], response[18]]);
+        if new_port == 0 || new_port != port { return Err("The paired device returned an invalid sync port.".into()) }
+        let expected = mac(&token_for_worker, &[b"lumaire-discovery-response-v1".as_slice(), &response[1..19]].concat());
+        if !constant_time_eq(&expected, &response[19..51]) { return Err("The nearby discovery response failed authentication.".into()) }
+        Ok(format!("http://{ip}:{new_port}/#{token_for_worker}"))
+    }).await.map_err(|_| "Nearby discovery failed.")?
+}
+
 #[tauri::command]
 pub async fn nearby_fetch(link: String) -> Result<SharedState, String> {
     let (url, token) = destination(&link)?;
@@ -186,7 +260,20 @@ pub async fn nearby_exchange(app: tauri::AppHandle, link: String) -> Result<bool
         let (mut sent,mut received)=device_sync::peer_favorites(db,&peer,history,favorites)?;
         if sent>local.revision || received>hello.revision { sent=0;received=0; }
         let outgoing=device_sync::page_favorites(db,sent,history,favorites,100)?;
-        Ok((Packet{device_id:local.device_id,since:received,cells:outgoing.cells,history,favorites:if v3 {Some(favorites)} else {None}},outgoing.cursor,outgoing.more))
+        
+        // Include our latest checkpoint in the packet
+        let checkpoint = if v3 {
+            db.query_row(
+                "SELECT checkpoint FROM playback_checkpoints WHERE device_id=?1",
+                [local.device_id.clone()],
+                |row| row.get::<_, String>(0)
+            ).optional().map_err(crate::err)?
+            .and_then(|json| serde_json::from_str(&json).ok())
+        } else {
+            None
+        };
+        
+        Ok((Packet{device_id:local.device_id,since:received,cells:outgoing.cells,history,favorites:if v3 {Some(favorites)} else {None},checkpoint},outgoing.cursor,outgoing.more))
     }).await?;
     url.set_path(if v3 {"/v3/sync"} else {"/v2/sync"});
     let body=serde_json::to_vec(&packet).map_err(crate::err)?;
@@ -202,6 +289,22 @@ pub async fn nearby_exchange(app: tauri::AppHandle, link: String) -> Result<bool
 mod tests {
     use super::*;
     #[test]
+    fn discovery_answers_only_authenticated_private_lan_requests() {
+        let token = "1234567890abcdef1234567890abcdef";
+        let nonce = [7u8; 16];
+        let proof = mac(token, &[b"lumaire-discovery-request-v1".as_slice(), &nonce].concat());
+        let mut request = [0u8; 49]; request[0] = 1; request[1..17].copy_from_slice(&nonce); request[17..].copy_from_slice(&proof);
+        let response = discover_response(token, &request, 4321, Ipv4Addr::new(192, 168, 1, 5)).unwrap();
+        assert_eq!(response[0], 2);
+        assert_eq!(&response[1..17], &nonce);
+        assert_eq!(u16::from_be_bytes([response[17], response[18]]), 4321);
+        let expected = mac(token, &[b"lumaire-discovery-response-v1".as_slice(), &response[1..19]].concat());
+        assert!(constant_time_eq(&expected, &response[19..]));
+        let mut forged = request; forged[17] ^= 1;
+        assert!(discover_response(token, &forged, 4321, Ipv4Addr::new(192, 168, 1, 5)).is_none());
+        assert!(discover_response(token, &request, 4321, Ipv4Addr::new(8, 8, 8, 8)).is_none());
+    }
+    #[test]
     fn restricts_pairing_to_explicit_private_addresses_without_redirects_or_credentials() {
         let token = "1234567890abcdef1234567890abcdef";
         assert!(destination(&format!("http://192.168.1.5:1234/#{token}")).is_ok());
@@ -211,6 +314,17 @@ mod tests {
     fn rejects_local_files_and_invalid_state() {
         let mut state = SharedState { playlists: vec![], now: Some(SharedNow { track: serde_json::from_value(serde_json::json!({"id":"local","title":"Song","artist":"Artist","album":"","duration":100,"fileName":"C:/secret.mp3","format":"MP3","missing":false})).unwrap(), position: 0.0, playing: false }) };
         assert!(validate(&mut state).is_err()); state.now = None; assert!(validate(&mut state).is_ok());
+    }
+    #[test]
+    fn strips_invalid_optional_recording_metadata_at_sync_boundary() {
+        let mut track: Track = serde_json::from_value(serde_json::json!({
+            "id":"youtube:abcdefghijk", "title":"Song", "artist":"Artist", "album":"Album",
+            "duration":100, "fileName":"song.m4a", "format":"m4a", "missing":false,
+            "source":{"providerId":"youtube","sourceId":"abcdefghijk","pageUrl":"https://youtube.com/watch?v=abcdefghijk","license":"","licenseUrl":"","attribution":""},
+            "recordingMetadata":{"sourceId":"invalid","isrcs":["not-an-isrc"],"releaseDate":"2024-02-31","artistAliases":{}}
+        })).unwrap();
+        clean_track(&mut track).unwrap();
+        assert!(track.recording_metadata.is_none());
     }
     #[test]
     fn actual_http_requires_pairing_and_returns_validated_metadata() {
@@ -246,7 +360,7 @@ mod tests {
         runtime.block_on(async {
             let client=reqwest::Client::builder().no_proxy().build().unwrap();
             let peer=uuid::Uuid::new_v4().to_string();
-            let packet=Packet{device_id:peer.clone(),since:0,cells:vec![device_sync::Cell{key:device_sync::key(&["name","mix"]),clock:1,device:peer,value:serde_json::json!("Concurrent mix")}],history:false,favorites:None};
+            let packet=Packet{device_id:peer.clone(),since:0,cells:vec![device_sync::Cell{key:device_sync::key(&["name","mix"]),clock:1,device:peer,value:serde_json::json!("Concurrent mix")}],history:false,favorites:None,checkpoint:None};
             let refused=client.post(format!("{base}/v2/sync")).json(&packet).send().await.unwrap();assert_eq!(refused.status().as_u16(),403);
             let hello=client.get(format!("{base}/v2/hello")).bearer_auth(token).send().await.unwrap();assert!(hello.status().is_success());
             for _ in 0..2 {

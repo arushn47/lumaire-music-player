@@ -13,6 +13,17 @@ function fixture() {
   return { tracker, writes, sample };
 }
 describe("real listening accounting", () => {
+  it('keeps an identified artist recording available when legacy rows supply the artwork', () => {
+    const { tracker, sample } = fixture();
+    for (let second = 0; second <= 20; second++) sample(second);
+    const legacy = { ...tracker.record!, id: 'legacy', artworkUrl: 'https://c.saavncdn.com/cover.jpg', metadataSourceId: null };
+    const identified = { ...tracker.record!, id: 'identified', artworkUrl: null, metadataSourceId: 'itunes:42' };
+    for (const records of [[legacy, identified], [identified, legacy]]) {
+      const stats = aggregateListening(records, 'all', wall + 30000);
+      expect(stats.artists[0].record.metadataSourceId).toBe('itunes:42');
+      expect(stats.totalMs).toBe(legacy.listenedMs + identified.listenedMs);
+    }
+  });
   it('recovers ranking artwork from later records without changing listening totals', () => {
     const { tracker, sample } = fixture();
     for (let second = 0; second <= 20; second++) sample(second);

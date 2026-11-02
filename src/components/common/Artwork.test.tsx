@@ -13,9 +13,12 @@ describe("Artwork fallback representations", () => {
     expect(byClass).not.toContain("lucide-music-2");
   });
 
-  it("renders the standard music note icon for tracks and albums", () => {
+  it("renders the standard music note icon for tracks and albums with centered flex styling", () => {
     const normal = renderToStaticMarkup(<Artwork />);
     expect(normal).toContain("lucide-music2");
+    expect(normal).toContain("display:inline-flex");
+    expect(normal).toContain("align-items:center");
+    expect(normal).toContain("justify-content:center");
     expect(normal).not.toContain("artist-fallback-icon");
 
     const album = renderToStaticMarkup(<Artwork kind="album" />);

@@ -1,3 +1,4 @@
+import {fillTrackMetadata} from '../domain/metadata-enrichment';
 import { type DownloadProgress } from "../domain/downloads";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushListening } from "../player/listening-service";
@@ -15,7 +16,7 @@ import {
   needsMetadata,
   repairYoutubeTrack,
 } from "../domain/online-track";
-import { canonicalArtistNames, canonicalTrack, catalogQueueTrack, resolveCatalogSource } from "../domain/catalog-track";
+import { canonicalTrack, catalogQueueTrack, failureKind, resolveCatalogSource } from "../domain/catalog-track";
 import { matchSource } from "../domain/source-matching";
 import { enqueue, setShuffle, isQueuedCatalog, resolveUpcomingCatalog } from "../domain/queue";
 import { restoreSession } from "../domain/session";
@@ -32,6 +33,7 @@ import {
   prepareCatalogCandidate,
 } from "../player/service";
 
+import { playbackEvent } from "../player/diagnostics";
 import type { ToastAction } from "../components/common/Banners";
 
 const LAST_PLAYLIST_KEY = "lumaire:last-playlist-id";
@@ -131,8 +133,89 @@ export function useLibraryManager() {
     const s = sessionRef.current;
     const state = player.state;
     const matching = s.queue.find(entry => entry.id === s.currentId)?.trackId === state.trackId;
-    return matching ? { ...checkpointListening(s, tracksRef.current, state.time, state.status === 'ended'), position: state.time } : s;
+    return matching ? { ...checkpointListening(s, tracksRef.current, state.time, state.status === 'ended'), position: state.time, ...(mobile ? {nativePositionAt:state.nativeStateAt} : {}) } : s;
   }
+
+  // Checkpoint capture for cross-device handoff
+  const lastCheckpointCapture = useRef({ time: 0, sessionHash: '' });
+  const capturePlaybackCheckpoint = useCallback(async () => {
+    if (!readyRef.current || !desktop) return;
+    
+    const s = sessionRef.current;
+    const state = player.state;
+    
+    // Skip if no meaningful playback state
+    if (!s.currentId || !s.queue.length) return;
+    
+    // Coalesce rapid updates - don't checkpoint more than once per 3 seconds
+    const now = Date.now();
+    if (now - lastCheckpointCapture.current.time < 3000) return;
+    
+    // Create a simple hash to detect meaningful changes
+    const sessionHash = JSON.stringify({
+      currentId: s.currentId,
+      queueIds: s.queue.map(e => e.id).slice(0, 5),
+      shuffle: s.settings.shuffle,
+      repeat: s.settings.repeat,
+    });
+    
+    // Skip if nothing meaningful changed
+    if (sessionHash === lastCheckpointCapture.current.sessionHash && now - lastCheckpointCapture.current.time < 10000) {
+      return;
+    }
+    
+    try {
+      const { captureCheckpoint } = await import('../domain/playback-checkpoint');
+      const { collections, checkpoint: checkpointApi } = await import('../adapters/collections');
+      let localDeviceId = localStorage.getItem('lumaire-device-id');
+      try {
+        const sync = await collections.syncState();
+        if (sync.deviceId) {
+          localDeviceId = sync.deviceId;
+          localStorage.setItem('lumaire-device-id', sync.deviceId);
+        }
+      } catch { /* offline / mock */ }
+      if (!localDeviceId) {
+        localDeviceId = crypto.randomUUID();
+        localStorage.setItem('lumaire-device-id', localDeviceId);
+      }
+      
+      const deviceName = mobile ? 'Android Phone' : 'Windows PC';
+      const checkpoint = captureCheckpoint(
+        s,
+        tracksRef.current,
+        state.time,
+        state.status === 'playing',
+        localDeviceId,
+        deviceName
+      );
+      
+      if (checkpoint) {
+        await checkpointApi.save(checkpoint);
+        lastCheckpointCapture.current = { time: now, sessionHash };
+      }
+    } catch (err) {
+      console.warn('Checkpoint capture failed:', err);
+    }
+  }, []);
+
+  // Trigger checkpoint on meaningful playback changes
+  useEffect(() => {
+    if (!ready) return;
+    void capturePlaybackCheckpoint();
+  }, [ready, session.currentId, session.settings.shuffle, session.settings.repeat]);
+
+  // Also checkpoint on player state changes (track change, pause)
+  useEffect(() => {
+    if (!ready) return;
+    const unsubscribe = player.subscribe(() => {
+      const state = player.state;
+      if (state.status === 'paused' || state.status === 'ended') {
+        void capturePlaybackCheckpoint();
+      }
+    });
+    return unsubscribe;
+  }, [ready, capturePlaybackCheckpoint]);
 
   const action = async (fn: () => Promise<void>) => {
     setBusy(true);
@@ -253,10 +336,19 @@ export function useLibraryManager() {
     const checkEngine = () => void refreshYoutubeEngine();
     checkEngine();
     window.addEventListener("focus", checkEngine);
+    
+    // Capture checkpoint on window focus for cross-device handoff
+    const onFocus = () => void capturePlaybackCheckpoint();
+    window.addEventListener("focus", onFocus);
 
     const timer = setInterval(persist, 2000);
     const onHidden = () => {
-      if (document.visibilityState === "hidden") persist();
+      if (document.visibilityState === "hidden") {
+        persist();
+        void capturePlaybackCheckpoint(); // Checkpoint before app goes to background
+      } else {
+        void capturePlaybackCheckpoint(); // Checkpoint when app returns to foreground
+      }
     };
     document.addEventListener("visibilitychange", onHidden);
     return () => {
@@ -264,6 +356,7 @@ export function useLibraryManager() {
       clearInterval(timer);
       document.removeEventListener("visibilitychange", onHidden);
       window.removeEventListener("focus", checkEngine);
+      window.removeEventListener("focus", onFocus);
     };
   }, []);
 
@@ -308,7 +401,7 @@ export function useLibraryManager() {
       if (base.metadataSourceId) {
         canonical = await library.lookupCatalog(base.metadataSourceId);
         enriched = { ...base, title: canonical.title, artist: canonical.artist,
-          album: canonical.album, duration: canonical.duration, artworkUrl: canonical.artworkUrl };
+          album: canonical.album, recordingMetadata: canonical.recordingMetadata, artworkUrl: canonical.artworkUrl };
       } else {
         let source = resolvedMusic.get(base.id);
         let metadata = null;
@@ -345,17 +438,17 @@ export function useLibraryManager() {
       if (enriched.metadataSourceId) {
         canonical ??= await library.lookupCatalog(enriched.metadataSourceId);
         enriched = { ...enriched, title: canonical.title, album: canonical.album,
-          artist: await canonicalArtistNames(canonical, async id => (await library.lookupArtist(id)).info),
+          artist: canonical.artist, recordingMetadata: canonical.recordingMetadata,
           artworkUrl: canonical.artworkUrl || enriched.artworkUrl };
       }
       const latest = tracksRef.current.find(t => t.id === base.id) || sessionRef.current.queueTracks[base.id];
       if (latest?.metadataSourceId && latest.metadataSourceId !== base.metadataSourceId) return;
-      if (latest) enriched = { ...enriched, offline: latest.offline };
+      enriched = fillTrackMetadata(latest || base, enriched, base);
       playbackTracks.set(enriched.id, enriched);
       if (tracksRef.current.some((t) => t.id === base.id)) {
-        enriched = await library.saveOnline(enriched, true);
+        enriched = await library.saveOnline(enriched, true, latest || base);
         setTracks((all) =>
-          all.map((t) => (t.id === enriched.id ? enriched : t)),
+          all.map((t) => (t.id === enriched.id ? fillTrackMetadata(t, enriched, latest || base) : t)),
         );
       } else {
         update((s) =>
@@ -390,8 +483,8 @@ export function useLibraryManager() {
     });
   }
 
-  const favorite = (id: string) => {
-    const track = tracksRef.current.find(t => t.id === id) || sessionRef.current.queueTracks[id];
+  const favorite = (id: string, candidate?: Track) => {
+    const track = tracksRef.current.find(t => t.id === id) || sessionRef.current.queueTracks[id] || candidate;
     if (!track) return;
     const toggle = (savedId: string) => {
       update((s) => ({
@@ -445,8 +538,17 @@ export function useLibraryManager() {
         await saveOnline(t);
       if (signal?.aborted) { setDownloads(prev => ({ ...prev, [t.id]: "Cancelled" })); return false; }
       signal?.addEventListener("abort", cancel, { once: true });
+      if (!signal) void library.downloadNotification?.({ active: true, title: t.title, done: 0, total: 0 });
+      let notificationPercent = -1;
       const saved = await library.download(t.id, progress => {
         setDownloads(prev => ({ ...prev, [t.id]: "downloading" }));
+        if (!signal && progress.total !== null && progress.total > 0) {
+          const percent = Math.floor(progress.received / progress.total * 100);
+          if (percent !== notificationPercent) {
+            notificationPercent = percent;
+            void library.downloadNotification?.({ active: true, title: t.title, done: progress.received, total: progress.total });
+          }
+        }
         onProgress?.(progress);
       });
       tracksRef.current = [
@@ -463,6 +565,7 @@ export function useLibraryManager() {
       return false;
     } finally {
       signal?.removeEventListener("abort", cancel);
+      if (!signal) void library.downloadNotification?.({ active: false, title: "", done: 0, total: 0 });
     }
   }
 
@@ -625,6 +728,7 @@ export function useLibraryManager() {
   }
 
   async function resolveDiscovery(result: CatalogTrack, refresh = false): Promise<Track> {
+    if (refresh) void library.deleteVerifiedSource?.(result.id)?.catch?.(() => {});
     const known = [...tracksRef.current, ...Object.values(sessionRef.current.queueTracks)]
       .find(t => t.metadataSourceId === result.id && !isQueuedCatalog(t));
     if (known && !refresh) {
@@ -634,20 +738,69 @@ export function useLibraryManager() {
         try {
           const details = await prepareCatalogCandidate(candidate);
           compatible = (await matchSource(result, { ...candidate, ...details })).accepted;
-        } catch { compatible = false; }
+        } catch (error) {
+          if (failureKind(error) === "cancelled") throw error;
+          compatible = false;
+        }
       }
-      if (compatible) return { ...known, title: result.title, artist: known.artist || result.artist,
-        album: result.album, duration: result.duration, artworkUrl: result.artworkUrl };
+      if (compatible) {
+        if (known.source?.sourceId) {
+          playbackEvent({ trackId: result.id, stage: "source-resolved", candidateId: known.source.sourceId, cache: "known" });
+        }
+        return { ...known, title: result.title, artist: known.artist || result.artist,
+          album: result.album, duration: result.duration, artworkUrl: result.artworkUrl };
+      }
       catalogSources.current.delete(result.id);
     }
     if (refresh) catalogSources.current.delete(result.id);
     let pending = catalogSources.current.get(result.id);
+    if (pending) playbackEvent({ trackId: result.id, stage: "source-cache", cache: "memory" });
     if (!pending) {
       if (catalogSources.current.size >= 128) catalogSources.current.delete(catalogSources.current.keys().next().value!);
-      pending = resolveCatalogSource(result, library.ytdlpSearch, { verify: prepareCatalogCandidate }).then(source => {
+      pending = (async () => {
+        if (!refresh) {
+          try {
+            const readAt = performance.now();
+            const cached = await library.getVerifiedSource?.(result.id);
+            playbackEvent({ trackId: result.id, stage: "verified-cache-read", durationMs: performance.now() - readAt, cache: cached ? "hit" : "miss" });
+            if (cached && cached.sourceProvider === "youtube") {
+              const candidate = {
+                id: cached.sourceId,
+                title: cached.title,
+                channel: cached.artist || "",
+                duration: cached.duration || null,
+                thumbnail: null,
+              };
+              const details = await prepareCatalogCandidate(candidate);
+              if (details) Object.assign(candidate, details);
+              const match = await matchSource(result, candidate);
+              if (match.accepted) {
+                playbackEvent({ trackId: result.id, stage: "source-resolved", candidateId: candidate.id, cache: "verified" });
+                const existing = tracksRef.current.find(t => t.id === `youtube:${candidate.id}`);
+                return canonicalTrack(result, candidate, existing);
+              }
+              playbackEvent({ trackId: result.id, stage: "rejected", candidateId: candidate.id, reason: `cached-${match.reason}` });
+              await library.deleteVerifiedSource?.(result.id);
+            }
+          } catch (error) {
+            if (failureKind(error) === "cancelled") throw error;
+            void library.deleteVerifiedSource?.(result.id)?.catch?.(() => {});
+          }
+        }
+        const source = await resolveCatalogSource(result, library.ytdlpSearch, { verify: prepareCatalogCandidate });
+        void library.setVerifiedSource?.(result.id, {
+          sourceId: source.id,
+          sourceProvider: "youtube",
+          title: source.title,
+          artist: source.channel || null,
+          duration: source.duration || null,
+        })?.catch?.(() => {});
         const existing = tracksRef.current.find(t => t.id === `youtube:${source.id}`);
         return canonicalTrack(result, source, existing);
-      }).catch(error => { catalogSources.current.delete(result.id); throw error; });
+      })().catch(error => {
+        catalogSources.current.delete(result.id);
+        throw error;
+      });
       catalogSources.current.set(result.id, pending);
     }
     return pending;
@@ -673,7 +826,13 @@ export function useLibraryManager() {
       }
       return;
     }
-    if (mode === "play" && player instanceof PlaybackController) {
+    if (mode === 'play' && mobile) {
+      const offline = tracksRef.current.find(track => track.metadataSourceId === result.id && track.offline && !track.missing);
+      setPendingTrack(null); pendingCatalog.current = null; setError('');
+      onPlayTrack(offline || catalogQueueTrack(result));
+      return;
+    }
+    if (mode === "play" && "beginLoading" in player) {
       if (player.state.trackId === result.id && player.state.status === "loading") return;
       const pending: Track = { id: result.id, title: result.title, artist: result.artist, album: result.album,
         duration: result.duration, artworkUrl: result.artworkUrl, metadataSourceId: result.id,
@@ -690,7 +849,6 @@ export function useLibraryManager() {
         if (player.state.playbackId === token) {
           const message = formatError(error);
           player.failLoading(token, message);
-          setError(message);
         }
       }
       return;
@@ -702,12 +860,8 @@ export function useLibraryManager() {
         await saveOnline(selected);
       }
       playbackTracks.set(selected.id, selected);
-      if (mode === "save") await saveOnline(selected);
+      if (mode === "save") { await saveOnline(selected); notify(`Saved ${selected.title} - online connection required`); }
       else if (mode === "play") onPlayTrack(selected);
-      notify(
-        `${mode === "play" ? "Loading" : "Saved"} ${selected.title} - online connection required`,
-      );
-
     });
   }
 

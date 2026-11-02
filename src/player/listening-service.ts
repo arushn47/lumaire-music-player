@@ -13,6 +13,11 @@ let pendingFailure: unknown = null;
 let resample = () => {};
 const unsaved = new Map<string, { generation: number; record: ListeningRecord }>();
 export function refreshListening() { resample(); }
+export function nativeListeningHandoff(fresh = false) {
+  if (!fresh) resample();
+  return { generation, record: fresh || !tracker?.record ? null : structuredClone(tracker.record),
+    nativeCount: fresh ? 0 : player.state.nativeListenedMs ?? 0 };
+}
 function queued(operation: () => Promise<void>) {
   chain = chain.then(operation).catch(error => { pendingFailure = error; report(error); });
 }
@@ -68,10 +73,17 @@ export async function startListening(
     retryWrites();
   });
   tracker = own;
+  let nativeHistoryRevision = -1;
+  let nativeHistoryEpoch: string | undefined;
   const sample = () => {
     const state = player.state;
+    if (state.nativeQueueEpoch !== nativeHistoryEpoch) { nativeHistoryEpoch = state.nativeQueueEpoch; nativeHistoryRevision = -1; }
+    if (mobile && state.nativeQueue && (state.nativeHistoryRevision ?? -1) > nativeHistoryRevision) {
+      nativeHistoryRevision = state.nativeHistoryRevision!;
+      historyChanged.dispatchEvent(new Event('change'));
+    }
     const time = "audio" in player ? player.audio.currentTime : state.time;
-    own.sample({ ...state, time }, state.trackId ? getTrack(state.trackId) : undefined, enabled(), performance.now(), Date.now());
+    own.sample({ ...state, time }, state.trackId ? getTrack(state.trackId) : undefined, enabled() && !(mobile && state.nativeQueue), performance.now(), Date.now());
   };
   const unsubscribe = player.subscribe(sample);
   resample = sample;

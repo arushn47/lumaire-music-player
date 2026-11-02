@@ -12,6 +12,12 @@ export function useListeningHistory(ready: boolean, sessionRef: React.MutableRef
   const [revision, setRevision] = useState(0);
   const refresh = () => setRevision(value => value + 1);
   useEffect(() => {
+    if (!mobile) return;
+    const visible = () => { if (!document.hidden) refresh(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => document.removeEventListener('visibilitychange', visible);
+  }, []);
+  useEffect(() => {
     if (!ready) return;
     let cancelled = false;
     let cleanup: (() => void) | undefined;

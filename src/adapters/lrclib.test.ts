@@ -19,6 +19,13 @@ const base: Track = {
 } as Track;
 
 describe("lookupLyrics artist placeholder", () => {
+  it('refreshes a cached provider remix for a studio track even when durations match',async()=>{
+    const doc=parseLyrics('[00:01]Old fixture');doc.source={provider:'lrclib',recordId:1,title:'Song (Remix)',artist:'Artist',duration:200};
+    invoke.mockResolvedValueOnce({kind:'plain',text:'New fixture'});
+    const result=await lookupLyrics({...base,id:'version-fixture'},doc);
+    expect(result.status).toBe('found');if(result.status==='found')expect(result.doc.raw).toBe('New fixture');
+    expect(doc.raw).toBe('[00:01]Old fixture');
+  });
   it("connects provider word markers to the rendered document without retiming variants", async () => {
     invoke.mockResolvedValueOnce({kind: "synced", lrc: "[00:01]<00:01>Hello <00:02>உலகம்<00:03>", matched: {provider: "lrc.red", id: "IND292218474", title: "Song", artist: "Artist", duration: 200}});
     const result = await lookupLyrics({...base, id: "word-fixture"});

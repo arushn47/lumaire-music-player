@@ -11,5 +11,6 @@ export type { LibraryViewProps } from "./LibraryView";
 export { ArtistView } from "./ArtistView";
 export { AlbumView } from "./AlbumView";
 export { ChartView } from "./ChartView";
+export { CollectionView } from "./CollectionView";
 export { initialDiscoveryViewState, type DiscoveryViewState } from "./DiscoveryView";
 export { SoftwareLicencesSection } from "./SoftwareLicencesSection";

@@ -12,7 +12,7 @@ import { cleanVideoTitle } from "../domain/online-track";
  */
 
 import { invoke, isTauri } from "@tauri-apps/api/core";
-import { normalizeCachedLyrics, parseLyrics } from "../domain/lyrics";
+import { normalizeCachedLyrics, parseLyrics, lyricsVersionMatches } from "../domain/lyrics";
 import type { LyricDocument, Track } from "../domain/types";
 
 /** Shape returned by the Rust fetch_lyrics command. */
@@ -51,7 +51,7 @@ export async function lookupLyrics(
   track: Track,
   cachedDoc?: LyricDocument,
 ): Promise<LookupState> {
-  if (cachedDoc)
+  if (cachedDoc && lyricsVersionMatches(cachedDoc,track.title))
     return {
       status: "found",
       doc: normalizeCachedLyrics(cachedDoc, track.duration),

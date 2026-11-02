@@ -73,8 +73,9 @@ export function aggregateListening(records: ListeningRecord[], range: HistoryRan
       old.plays += 1;
       if (!old.artworkUrl && record.artworkUrl) {
         old.artworkUrl = record.artworkUrl;
-        old.record = record;
+        if (group !== groups.artists || !old.record.metadataSourceId || record.metadataSourceId) old.record = record;
       }
+      if (group === groups.artists && !old.record.metadataSourceId && record.metadataSourceId) old.record = record;
     }
     else group.set(key, { key, title, subtitle, ms, plays: 1, artworkUrl: record.artworkUrl, record });
   };

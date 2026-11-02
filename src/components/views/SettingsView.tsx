@@ -264,18 +264,7 @@ export function SettingsView({
               </div>
             </div>
 
-            {!mobile && <div className="settings-section">
-              <h3 className="section-label">Desktop fullscreen player</h3>
-              <div className="theme-mode-toggle" role="group" aria-label="Fullscreen layout">
-                {(["immersive", "minimal"] as const).map(layout => <button key={layout}
-                  className={`theme-option ${(session.settings.fullscreenLayout ?? "immersive") === layout ? "selected" : ""}`}
-                  aria-pressed={(session.settings.fullscreenLayout ?? "immersive") === layout}
-                  onClick={() => onSetting("fullscreenLayout", layout)}>
-                  {layout === "immersive" ? "Immersive" : "Minimal"}
-                </button>)}
-              </div>
-              <p className="setting-description">Cinematic imagery and lyrics, or the classic centered artwork player.</p>
-            </div>}
+
 
             <div className="settings-section">
               <h3 className="section-label">Accent Color</h3>

@@ -1,4 +1,5 @@
-import { MusicMetadataDetails } from "../common/MusicMetadataDetails";
+import { rememberArtistResolution, useArtistResolutions } from '../../adapters/artist-resolution';
+import { groupRecordings } from '../../domain/recording-groups';
 import React, { useEffect, useState } from "react";
 import { library } from "../../adapters/native";
 import type { DiscoveryViewProps } from "./DiscoveryView";
@@ -6,11 +7,13 @@ import { ChevronLeft, CircleAlert, Loader2, Heart, Play } from "lucide-react";
 import { Artwork } from "../common";
 import { CatalogTrackList } from "../common/CatalogTrackList";
 import type { CatalogActionHandlers } from "../common/CatalogTrackActions";
+import { artistLookupName } from "../../domain/catalog-links";
+import type { CatalogArtist } from "../../adapters/native";
 
 interface ArtistViewProps extends CatalogActionHandlers {
   artistId: string;
   favoriteArtists: import("../../domain/types").Session["favoriteArtists"];
-  onFavoriteArtist: (artist: import("../../adapters/native").CatalogArtist) => void;
+  onFavoriteArtist: (artist: import("../../adapters/native").CatalogArtist, verifiedIds?: string[]) => void;
   onNavigateAlbum: (albumId: string) => void;
   onNavigateArtist: (artistId: string) => void;
   onSaveDiscovery: DiscoveryViewProps["onSaveDiscovery"];
@@ -41,18 +44,36 @@ export function ArtistView({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
+  const [choices, setChoices] = useState<(CatalogArtist & { tracks?: string[] })[]>([]);
+  const lookupName = artistLookupName(artistId);
+  const resolutions = useArtistResolutions();
+  const resolvedId = resolutions.find(value => value.verifiedIds.includes(artistId))?.artist.id;
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
     setError("");
-    library
-      .lookupArtist(artistId)
-      .then(result => { if (!cancelled) setData(result); })
+    setData(null);
+    setChoices([]);
+    const request = lookupName
+      ? library.searchCatalogEntities(lookupName).then(async result => {
+        const options = await Promise.all(result.artists.map(async artist => {
+          try { const profile = await library.lookupArtist(artist.id); return { ...profile.info, tracks: profile.topTracks.slice(0, 2).map(track => track.title) }; }
+          catch { return artist; }
+        }));
+        if (!cancelled) setChoices([...new Map(options.map(artist => [artist.id, artist])).values()]);
+      })
+      : library.lookupArtist(artistId).then(result => {
+        if (!cancelled) {
+          setData(result);
+          if (result.verifiedIds?.length && !resolvedId) rememberArtistResolution({ query: result.info.name, verifiedIds: result.verifiedIds, artist: result.info });
+        }
+      });
+    request
       .catch((err) => { if (!cancelled) setError(err instanceof Error ? err.message : String(err)); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [artistId, attempt]);
+  }, [artistId, attempt, lookupName, resolvedId]);
 
   if (loading) {
     return (
@@ -61,6 +82,20 @@ export function ArtistView({
         <p>Loading artist...</p>
       </div>
     );
+  }
+
+  if (lookupName && !error) {
+    return <section className="artist-choices" aria-label="Choose artist identity">
+      <button onClick={onBack} className="subtle"><ChevronLeft size={16} />Back</button>
+      <h1>Choose an artist for “{lookupName}”</h1>
+      <p>Choose an artist to explore their songs and releases.</p>
+      <div className="search-artists-grid">{choices.map(artist => <button key={artist.id} className="search-artist-card" onClick={() => onNavigateArtist(artist.id)}>
+        <Artwork url={artist.artworkUrl} kind="artist" />
+        <span className="search-artist-name">{artist.name}</span>
+        {artist.tracks?.length ? <span className="artist-choice-tracks">{artist.tracks.map((title, index) => <span className="artist-choice-track" key={index} title={title}>{title}</span>)}</span> : null}
+      </button>)}</div>
+      {!choices.length && <p>No artists are available.</p>}
+    </section>;
   }
 
   if (error || !data) {
@@ -77,10 +112,11 @@ export function ArtistView({
     );
   }
 
-  const isFavorite = favoriteArtists.some(artist => artist.id === data.info.id);
+  const savedFavorite = favoriteArtists.find(artist => artist.id === data.info.id || data.verifiedIds?.includes(artist.id));
+  const isFavorite = Boolean(savedFavorite);
 
   return (
-    <div className="artist-page">
+    <div className="artist-page" data-artist-id={data.info.id}>
       <div className="catalog-toolbar">
         <button onClick={onBack} className="subtle"><ChevronLeft size={16} />Back</button>
       </div>
@@ -98,7 +134,7 @@ export function ArtistView({
               className={`subtle artist-favorite-btn ${isFavorite ? "is-active" : ""}`}
               aria-pressed={isFavorite}
               title={isFavorite ? "Remove from favorite artists" : "Add to favorite artists"}
-              onClick={() => onFavoriteArtist(data.info)}
+              onClick={() => onFavoriteArtist(data.info, data.verifiedIds)}
             >
               <Heart size={16} fill={isFavorite ? "currentColor" : "none"} />
               <span>{isFavorite ? "Favorited" : "Favorite artist"}</span>
@@ -110,7 +146,7 @@ export function ArtistView({
       {data.topTracks.length > 0 && (
         <section className="catalog-section artist-section">
           <h2>Popular tracks</h2>
-          <CatalogTrackList savedTracks={savedTracks} favorites={favorites} onCatalogAction={onCatalogAction} tracks={data.topTracks} onNavigateAlbum={onNavigateAlbum} busy={busy} downloads={downloads} onSaveDiscovery={onSaveDiscovery} onNavigateArtist={onNavigateArtist} />
+          <CatalogTrackList savedTracks={savedTracks} favorites={favorites} onCatalogAction={onCatalogAction} tracks={groupRecordings(data.topTracks, savedTracks, favorites).map(group => group.primary)} onNavigateAlbum={onNavigateAlbum} busy={busy} downloads={downloads} onSaveDiscovery={onSaveDiscovery} onNavigateArtist={onNavigateArtist} />
         </section>
       )}
       {data.topTracks.length === 0 && <p className="subtitle catalog-empty">No popular tracks are available for this artist.</p>}
@@ -171,7 +207,6 @@ export function ArtistView({
       )}
       {data.albums.length === 0 && <p className="subtitle catalog-empty">No releases are available for this artist.</p>}
 
-      <MusicMetadataDetails key={data.info.id} kind="artist" title={data.info.name} />
     </div>
   );
 }

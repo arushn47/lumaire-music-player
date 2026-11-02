@@ -14,8 +14,7 @@ external Python installation.
 
 Run `node scripts/android-runtime-prepare.mjs` to verify the pinned wheel/source
 hashes and build QuickJS with the NDK. Run the normal Android configure/build
-scripts afterward. Dependencies are bundled at build time. Remote runtime and
-EJS component downloads are disabled in the resolver.
+scripts afterward. Bundled dependencies remain an offline fallback. The resolver checks for the official stable yt-dlp wheel and its exact EJS dependency at most daily, verifies published hashes, and activates successful import checks in its private process. Python and QuickJS remain bundled; they require an APK update.
 
 `streaming.gradle` is applied only by Android. Set
 `ORG_GRADLE_PROJECT_lumaireStreaming=false` to omit the bundled runtime and

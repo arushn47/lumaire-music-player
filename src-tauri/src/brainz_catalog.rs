@@ -5,7 +5,7 @@ const BASE: &str = "https://musicbrainz.org/ws/2";
 fn uuid(value: &str) -> Option<String> { let id = uuid::Uuid::parse_str(value).ok()?; (id.to_string() == value).then(|| value.into()) }
 fn text(value: &Value) -> Option<String> { let value = value.as_str()?.trim(); (!value.is_empty() && value.len() <= 4000 && !value.chars().any(char::is_control)).then(|| value.into()) }
 fn credits(value: &Value) -> Vec<CatalogArtistCredit> {
-    value.as_array().into_iter().flatten().filter_map(|credit| Some(CatalogArtistCredit { name: text(&credit["name"]).or_else(|| text(&credit["artist"]["name"]))?, id: Some(format!("musicbrainz:artist:{}", uuid(credit["artist"]["id"].as_str()?)?)) })).collect()
+    value.as_array().into_iter().flatten().filter_map(|credit| Some(CatalogArtistCredit { name: text(&credit["name"]).or_else(|| text(&credit["artist"]["name"]))?, id: credit["artist"]["id"].as_str().and_then(uuid).map(|id| format!("musicbrainz:artist:{id}")) })).collect()
 }
 fn release(value: &Value, fallback: &[CatalogArtistCredit]) -> Option<CatalogAlbum> {
     let id = uuid(value["id"].as_str()?)?;
@@ -17,7 +17,7 @@ fn recording(value: &Value, fallback_release: Option<&CatalogAlbum>) -> Option<C
     if artists.is_empty() { return None; }
     let duration = value["length"].as_u64().filter(|length| (1000..=86400000).contains(length))? as f64 / 1000.0;
     let album = fallback_release.cloned().or_else(|| value["releases"].as_array()?.iter().find_map(|row| release(row, &artists)));
-    Some(CatalogTrack { play_count: None, id: format!("musicbrainz:recording:{id}"), title: text(&value["title"])?, artist: artists.iter().map(|credit| credit.name.clone()).collect::<Vec<_>>().join(", "), artist_id: artists.first()?.id.clone(), artists, album: album.as_ref().map(|album| album.title.clone()).unwrap_or_default(), album_id: album.as_ref().map(|album| album.id.clone()), duration, artwork_url: album.and_then(|album| album.artwork_url), genre: None, language: None })
+    Some(CatalogTrack { recording_metadata: crate::recording_metadata::from_provider(format!("musicbrainz:recording:{id}"), &value["isrcs"], value["first-release-date"].as_str(), &value["artist-credit"]), play_count: None, id: format!("musicbrainz:recording:{id}"), title: text(&value["title"])?, artist: artists.iter().map(|credit| credit.name.clone()).collect::<Vec<_>>().join(", "), artist_id: artists.first()?.id.clone(), artists, album: album.as_ref().map(|album| album.title.clone()).unwrap_or_default(), album_id: album.as_ref().map(|album| album.id.clone()), duration, artwork_url: album.and_then(|album| album.artwork_url), genre: None, language: None })
 }
 async fn get(path: &str, params: &[(&str, String)]) -> Result<Value, String> {
     let mut params = params.to_vec(); params.push(("fmt", "json".into())); music_metadata::brainz_json(&format!("{BASE}/{path}"), &params).await
@@ -29,7 +29,7 @@ pub async fn search(query: &str) -> Result<Vec<CatalogTrack>, String> {
 }
 pub async fn lookup(id: &str) -> Result<CatalogTrack, String> {
     let source = id.strip_prefix("musicbrainz:recording:").and_then(uuid).ok_or("Invalid MusicBrainz recording ID.")?;
-    let value = get(&format!("recording/{source}"), &[("inc", "artist-credits+releases".into())]).await?;
+    let value = get(&format!("recording/{source}"), &[("inc", "artist-credits+releases+isrcs".into())]).await?;
     let track = recording(&value, None).ok_or("MusicBrainz recording metadata is incomplete.")?;
     if track.id != id { return Err("MusicBrainz returned another recording.".into()); } Ok(track)
 }
@@ -41,8 +41,8 @@ pub async fn artist(id: &str) -> Result<ArtistDetails, String> {
     let rows = get("recording", &[("artist", source), ("inc", "artist-credits+releases".into()), ("limit", "50".into())]).await?;
     let tracks: Vec<_> = rows["recordings"].as_array().into_iter().flatten().filter_map(|row| recording(row, None)).filter(|track| track.artists.iter().any(|credit| credit.id.as_deref() == Some(id))).collect();
     let mut albums = Vec::new();
-    for row in rows["recordings"].as_array().into_iter().flatten() { for album in row["releases"].as_array().into_iter().flatten().filter_map(|album| release(album, &credits(&row["artist-credit"]))) { if !albums.iter().any(|old: &CatalogAlbum| old.id == album.id) { albums.push(album); } } }
-    Ok(ArtistDetails { info: CatalogArtist { id: id.into(), name, artwork_url: None }, top_tracks: tracks.into_iter().take(20).collect(), albums, similar_artists: vec![] })
+    for row in rows["recordings"].as_array().into_iter().flatten().filter(|row| credits(&row["artist-credit"]).iter().any(|credit| credit.id.as_deref() == Some(id))) { for album in row["releases"].as_array().into_iter().flatten().filter_map(|album| release(album, &credits(&row["artist-credit"]))) { if !albums.iter().any(|old: &CatalogAlbum| old.id == album.id) { albums.push(album); } } }
+    Ok(ArtistDetails { evidence: vec![], verified_ids: vec![], info: CatalogArtist { id: id.into(), name, artwork_url: None }, top_tracks: tracks.into_iter().take(20).collect(), albums, similar_artists: vec![] })
 }
 pub async fn album(id: &str) -> Result<AlbumDetails, String> {
     let source = id.strip_prefix("musicbrainz:release:").and_then(uuid).ok_or("Invalid MusicBrainz release ID.")?;
@@ -62,6 +62,13 @@ pub async fn album(id: &str) -> Result<AlbumDetails, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn incomplete_artist_ids_do_not_erase_named_performers() {
+        let rows = credits(&serde_json::json!([{"name":"Guest","artist":{"id":"invalid"}}, {"artist":{"name":"Singer"}}, {"name":" "}]));
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[0].name, "Guest"); assert!(rows[0].id.is_none());
+        assert_eq!(rows[1].name, "Singer"); assert!(rows[1].id.is_none());
+    }
     #[test]
     fn pal_pal_keeps_original_and_talwiinder_recording_identities_separate() {
         let make = |id, length, names: &[(&str, &str)]| serde_json::json!({"id":id,"title":"Pal Pal","length":length,"artist-credit":names.iter().map(|(name,id)| serde_json::json!({"name":name,"artist":{"id":id,"name":name}})).collect::<Vec<_>>()});

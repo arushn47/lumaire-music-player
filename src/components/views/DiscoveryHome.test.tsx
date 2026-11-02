@@ -13,18 +13,18 @@ const record = (track: Track, age: number, id = track.id): ListeningRecord => ({
 const base: DiscoveryHomeProps = { onPlayAlbum: async () => {}, onPlayQuickPick: noop, searches: [], records: [], savedTracks: [], busy: false, onlineAvailable: false, onSearch: noop, onClearSearches: noop, onReplay: noop };
 
 describe('Home shelves', () => {
-  it('shows every mobile shelf with honest guidance until real history qualifies', () => {
+  it('shows only Quick Picks for a new mobile listener', () => {
     const html = renderToStaticMarkup(<DiscoveryHome {...base} mobile />);
-    expect([...html.matchAll(/<section aria-label="([^"]+)"/g)].map(match => match[1])).toEqual(['Recently Played', 'Continue Listening', 'Quick Picks', 'Your Rotation', 'Forgotten Favorites']);
-    expect(html).toContain('on this device');
+    expect([...html.matchAll(/<section aria-label="([^"]+)"/g)].map(match => match[1])).toEqual(['Quick Picks']);
+    expect(html).not.toContain('on this device');
     expect(html).not.toContain('recent-track-item');
   });
-  it('renders real activity and recommendations in the requested order', () => {
+  it.each([false, true])('renders populated shelves in order (mobile=%s)', mobile => {
     const [recent, rotation, forgotten, unheard, resumeA, resumeB] = ['Recent song', 'Rotation song', 'Old favorite', 'Unheard song', 'Continue A', 'Continue B'].map(song);
     const tracks = [recent, rotation, forgotten, unheard, resumeA, resumeB];
     const s = { ...defaults(), queue: [{ id: 'a', trackId: resumeA.id }, { id: 'b', trackId: resumeB.id }], currentId: 'a' };
     const resumes = checkpointListening(s, tracks, 38).listeningResumes;
-    const html = renderToStaticMarkup(<DiscoveryHome {...base} savedTracks={tracks} favorites={[forgotten.id]} resumes={resumes} records={[record(recent, 1), ...[1, 2, 3].map((d, i) => record(rotation, d, `r${i}`)), record(forgotten, 60)]} />);
+    const html = renderToStaticMarkup(<DiscoveryHome {...base} mobile={mobile} savedTracks={tracks} favorites={[forgotten.id]} resumes={resumes} records={[record(recent, 1), ...[1, 2, 3].map((d, i) => record(rotation, d, `r${i}`)), record(forgotten, 60)]} />);
     const labels = [...html.matchAll(/<section aria-label="([^"]+)"/g)].map(match => match[1]);
     expect(labels).toEqual(['Recently Played', 'Continue Listening', 'Quick Picks', 'Your Rotation', 'Forgotten Favorites']);
     for (const track of [recent, unheard]) expect(html.match(new RegExp(`title="Play ${track.title}"`, 'g'))).toHaveLength(1);
@@ -49,5 +49,16 @@ describe('Home shelves', () => {
     expect(html).toContain('Quick Picks');
     for (const label of ['Recently Played', 'Continue Listening', 'Your Rotation', 'Forgotten Favorites']) expect(html).not.toContain(`aria-label="${label}"`);
     expect(renderToStaticMarkup(<DiscoveryHome {...base} />)).not.toContain('<section');
+  });
+  it('renders clickable artist links on desktop while keeping plain text on mobile', () => {
+    const track = { ...song('Test Song'), artist: 'Featured Artist' };
+    const desktopHtml = renderToStaticMarkup(<DiscoveryHome {...base} mobile={false} savedTracks={[track]} records={[record(track, 0)]} onNavigateArtist={noop} />);
+    const desktopRecent = desktopHtml.slice(desktopHtml.indexOf('<section aria-label="Recently Played"'), desktopHtml.indexOf('</section>'));
+    expect(desktopRecent).toContain('<button type="button" class="link-button">Featured Artist</button>');
+
+    const mobileHtml = renderToStaticMarkup(<DiscoveryHome {...base} mobile={true} savedTracks={[track]} records={[record(track, 0)]} onNavigateArtist={noop} />);
+    const mobileRecent = mobileHtml.slice(mobileHtml.indexOf('<section aria-label="Recently Played"'), mobileHtml.indexOf('</section>'));
+    expect(mobileRecent).toContain('Featured Artist');
+    expect(mobileRecent).not.toContain('<button type="button" class="link-button">Featured Artist</button>');
   });
 });

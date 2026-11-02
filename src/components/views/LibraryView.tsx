@@ -1,4 +1,5 @@
-import React from "react";
+import { resolvedArtists, useArtistResolutions } from '../../adapters/artist-resolution';
+import React, { useMemo, useState } from "react";
 import {
   Activity,
   Check,
@@ -13,6 +14,7 @@ import {
   Pause,
   Play,
   Plus,
+  RefreshCw,
   Search,
   Shuffle,
   X,
@@ -39,6 +41,7 @@ export interface LibraryViewProps {
   visible: Track[];
   rows: { t: Track; entryId: string }[];
   currentTrack?: Track | null;
+  playbackDuration?: number;
   playbackStatus: Playback["status"];
   session: Session;
   downloads: Record<string, string>;
@@ -84,6 +87,7 @@ export function LibraryView({
   visible,
   rows,
   currentTrack,
+  playbackDuration,
   playbackStatus,
   session,
   downloads,
@@ -116,8 +120,30 @@ export function LibraryView({
   onOpenAddMusic,
   onPlayCollection,
 }: LibraryViewProps) {
+  const [filter, setFilter] = useState<"playlists" | "songs" | "albums" | "artists" | null>(null);
+  const activeFilter = filter ?? (view === "favorites" ? "songs" : view === "albums" ? "albums" : view === "artists" ? "artists" : null);
+  const isMobile = Boolean(mobile) || (typeof window !== "undefined" && window.innerWidth <= 768);
+
+  const favoriteTracks = useMemo(
+    () => tracks.filter((t) => session.favorites.includes(t.id)),
+    [tracks, session.favorites],
+  );
+  const favoriteRows = useMemo(() => {
+    const filtered = query
+      ? favoriteTracks.filter((t) => `${t.title} ${t.artist} ${t.album || ""}`.toLowerCase().includes(query.toLowerCase()))
+      : favoriteTracks;
+    return filtered.map((t) => ({ t, entryId: t.id }));
+  }, [favoriteTracks, query]);
+
+  const displayRows = (filter === "songs" ? favoriteRows : rows).map(row => {
+    const current = currentTrack && (row.t.id === currentTrack.id || row.t.id === currentTrack.metadataSourceId || (row.t.metadataSourceId && row.t.metadataSourceId === currentTrack.metadataSourceId));
+    const duration = current ? playbackDuration || currentTrack.duration : 0;
+    return !row.t.duration && duration && Number.isFinite(duration) && duration > 0
+      ? { ...row, t: { ...row.t, duration } } : row;
+  });
+
   const isPlaylistOrFavorites = Boolean(playlist) || view === "favorites";
-  const totalSeconds = rows.reduce((acc, { t }) => acc + (t.duration || 0), 0);
+  const totalSeconds = displayRows.reduce((acc, { t }) => acc + (t.duration || 0), 0);
   const totalMinutes = Math.floor(totalSeconds / 60);
   const remainingSeconds = Math.floor(totalSeconds % 60);
   const durationFormatted =
@@ -127,7 +153,7 @@ export function LibraryView({
 
   const coverArtworks = Array.from(
     new Set(
-      rows
+      displayRows
         .map(({ t }) => t.artworkUrl)
         .filter((url): url is string => typeof url === "string" && url.trim().length > 0)
     )
@@ -135,9 +161,48 @@ export function LibraryView({
 
   const libraryAlbums = session.favoriteAlbums.filter(album =>
     `${album.title} ${album.artist}`.toLowerCase().includes(query.toLowerCase()));
-  const libraryArtists = session.favoriteArtists.filter(artist =>
+  const confirmedArtists = useArtistResolutions();
+  const favoriteArtistCards = resolvedArtists(session.favoriteArtists, confirmedArtists);
+  const libraryArtists = favoriteArtistCards.filter(artist =>
     artist.name.toLowerCase().includes(query.toLowerCase()));
   const libraryRoot = ["library", "favorites", "albums", "artists"].includes(view);
+
+  const visibleCollections = useMemo(() => {
+    const list = filter === "playlists"
+      ? collections.filter((c) => c.playlist)
+      : collections;
+    return list.filter((collection) =>
+      !query ||
+      `${collection.name} ${collection.tracks.map((track) => `${track.title} ${track.artist}`).join(" ")}`
+        .toLocaleLowerCase()
+        .includes(query.toLocaleLowerCase())
+    );
+  }, [collections, filter, query]);
+
+  const showLikedCard = Boolean(
+    !query || "liked songs liked music favorites".includes(query.toLocaleLowerCase())
+  );
+  const totalPlaylistsCount = visibleCollections.length + (showLikedCard ? 1 : 0);
+
+  const handleFilterClick = (key: string) => {
+    onSetQuery("");
+    if (activeFilter === key) {
+      setFilter(null);
+      if (view !== "library") onSelectView("library");
+    } else if (key === "songs") {
+      setFilter(null);
+      onSelectView("favorites");
+    } else if (key === "albums") {
+      setFilter(null);
+      onSelectView("albums");
+    } else if (key === "artists") {
+      setFilter(null);
+      onSelectView("artists");
+    } else if (key === "playlists") {
+      setFilter("playlists");
+      if (view !== "library") onSelectView("library");
+    }
+  };
 
   return (
     <>
@@ -148,9 +213,17 @@ export function LibraryView({
             <IconButton label="Listening history" onClick={() => onSelectView("history")}><Activity size={21} /></IconButton>
           </div>
           <nav className="mobile-library-filters" aria-label="Library sections">
-            {[["library", "Playlists"], ["favorites", "Songs"], ["albums", "Albums"], ["artists", "Artists"]].map(([destination, label]) => (
-              <button type="button" key={destination} aria-current={view === destination ? "page" : undefined}
-                onClick={() => { onSetQuery(""); onSelectView(destination); }}>{label}</button>
+            {[["playlists", "Playlists"], ["songs", "Songs"], ["albums", "Albums"], ["artists", "Artists"]].map(([key, label]) => (
+              <button
+                type="button"
+                key={key}
+                className={activeFilter === key ? "active" : undefined}
+                aria-pressed={activeFilter === key}
+                aria-current={activeFilter === key ? "page" : undefined}
+                onClick={() => handleFilterClick(key)}
+              >
+                {label}
+              </button>
             ))}
           </nav>
           <div className="mobile-library-shortcuts">
@@ -231,6 +304,44 @@ export function LibraryView({
                 <Plus size={16} />
                 Add music
               </button>
+              {playlist && onDownloadPlaylist && rows.length > 0 && (
+                <button
+                  type="button"
+                  className={`subtle download-btn ${downloadProgress?.active ? "is-downloading" : rows.every(r => r.t.offline && !r.t.missing) ? "is-downloaded" : downloadProgress?.failed.length ? "has-errors" : ""}`}
+                  onClick={downloadProgress?.active ? (onPauseDownload || (() => {})) : onDownloadPlaylist}
+                  title={downloadProgress?.active ? (downloadProgress.paused ? "Resume download" : "Pause download") : rows.every(r => r.t.offline && !r.t.missing) ? "Downloaded" : "Download playlist"}
+                >
+                  {downloadProgress?.active ? (
+                    <Loader2 size={16} className="spin" />
+                  ) : rows.every(r => r.t.offline && !r.t.missing) ? (
+                    <Check size={16} />
+                  ) : downloadProgress?.failed.length ? (
+                    <RefreshCw size={16} />
+                  ) : (
+                    <Download size={16} />
+                  )}
+                  <span>
+                    {downloadProgress?.active
+                      ? `${downloadProgress.paused ? "Paused" : "Downloading"} ${downloadProgress.done}/${downloadProgress.total}`
+                      : rows.every(r => r.t.offline && !r.t.missing)
+                      ? "Downloaded"
+                      : downloadProgress?.failed.length
+                      ? `Retry (${downloadProgress.failed.length})`
+                      : "Download"}
+                  </span>
+                </button>
+              )}
+              {downloadProgress?.active && onCancelDownload && (
+                <button
+                  type="button"
+                  className="subtle download-cancel-btn"
+                  onClick={onCancelDownload}
+                  title="Cancel download"
+                  aria-label="Cancel download"
+                >
+                  <X size={15} />
+                </button>
+              )}
               {(playlist || view === "favorites") && (
                 <details className="track-menu collection-menu">
                   <summary aria-label="Collection options" title="Collection options">
@@ -261,21 +372,6 @@ export function LibraryView({
                 </details>
               )}
             </div>
-            {downloadProgress && playlist && (
-              <div className="album-download-progress" aria-busy={downloadProgress.active}>
-                <p className="subtitle" role="status">{downloadProgress.active
-                  ? downloadProgress.cancelled ? "Cancelling download…" : downloadProgress.paused && downloadProgress.stage === "Waiting" ? `Paused · ${downloadProgress.done} of ${downloadProgress.total} tracks processed` : `Track ${Math.min(downloadProgress.done + 1, downloadProgress.total)} of ${downloadProgress.total} · ${downloadProgress.stage}${downloadProgress.title ? `: ${downloadProgress.title}` : ""}${downloadProgress.paused ? " · Pausing after this track" : ""}`
-                  : `${downloadProgress.done - downloadProgress.failed.length} of ${downloadProgress.total} tracks available offline${downloadProgress.cancelled ? " · Cancelled" : downloadProgress.failed.length ? ` · ${downloadProgress.failed.length} failed` : " · Download complete"}`}
-                </p>
-                {downloadProgress.active && <div className="album-download-controls">
-                  <IconButton label={downloadProgress.paused ? "Resume download" : "Pause after current track"} active={downloadProgress.paused} disabled={downloadProgress.cancelled} onClick={onPauseDownload || (() => {})}>{downloadProgress.paused ? <Play size={16} /> : <Pause size={16} />}</IconButton>
-                  <IconButton label="Cancel download" disabled={downloadProgress.cancelled} onClick={onCancelDownload || (() => {})}><X size={16} /></IconButton>
-                </div>}
-                <progress aria-label="Playlist download progress" value={Math.min(downloadProgress.total, downloadProgress.done + (downloadProgress.active ? (downloadProgress.percent || 0) / 100 : 0))} max={downloadProgress.total} />
-                {downloadProgress.active && <small>{downloadProgress.done} of {downloadProgress.total} tracks processed · You can keep listening while this downloads.</small>}
-                {downloadProgress.failed.length > 0 && <details><summary>{downloadProgress.failed.length} failed · Retry download to try again</summary><ul>{downloadProgress.failed.map((title, index) => <li key={index}>{title}</li>)}</ul></details>}
-              </div>
-            )}
           </div>
         </div>
       ) : (
@@ -283,12 +379,34 @@ export function LibraryView({
           <div>
             <p className="eyebrow">YOUR LIBRARY</p>
             <h1>
-              {view === "library" ? "Playlists" : heading}
+              {view === "library"
+                ? mobile
+                  ? filter === "playlists"
+                    ? "Playlists"
+                    : filter === "artists"
+                      ? "Artists"
+                      : filter === "albums"
+                        ? "Albums"
+                        : filter === "songs"
+                          ? "Songs"
+                          : "Library"
+                  : "Playlists"
+                : heading}
               <span className="heading-dot">.</span>
             </h1>
             <p className="subtitle">
               {view === "library"
-                ? "Your playlists, mixes, and custom collections."
+                ? mobile
+                  ? filter === "playlists"
+                    ? "Your playlists, mixes, and custom collections."
+                    : filter === "artists"
+                      ? "Favorite and saved artists."
+                      : filter === "albums"
+                        ? "Albums saved in your library."
+                        : filter === "songs"
+                          ? "Songs saved in your library."
+                          : "All your music, playlists, albums, and artists in one place."
+                  : "Your playlists, mixes, and custom collections."
                 : view === "artists"
                   ? "Favorite and saved artists."
                   : view === "albums"
@@ -341,23 +459,41 @@ export function LibraryView({
         </div>
       )}
 
+      {mobile && view === "library" && (
+        <div className="library-filter-chips" role="toolbar" aria-label="Library filters">
+          {[["playlists", "Playlists"], ["songs", "Songs"], ["albums", "Albums"], ["artists", "Artists"]].map(([key, label]) => (
+            <button
+              type="button"
+              key={key}
+              className={`library-filter-chip ${activeFilter === key ? "active" : ""}`}
+              aria-pressed={activeFilter === key}
+              onClick={() => handleFilterClick(key)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <section className="library-tools">
         <label className="search">
           <Search size={17} />
           <input
             aria-label="Search local library"
             placeholder={
-              view === "artists"
+              view === "artists" || filter === "artists"
                 ? "Search artists…"
-                : view === "albums"
+                : view === "albums" || filter === "albums"
                   ? "Search albums…"
-                  : view === "library"
+                  : view === "library" && (filter === "playlists" || !mobile)
                     ? "Search playlists…"
-                    : view === "favorites"
-                      ? "Find in Liked Songs…"
-                      : playlist
-                        ? `Find in ${heading}…`
-                        : "Find a song, artist, or album"
+                    : view === "library" && filter === "songs"
+                      ? "Search favorite songs…"
+                      : view === "favorites"
+                        ? "Find in Liked Songs…"
+                        : playlist
+                          ? `Find in ${heading}…`
+                          : "Find in your library…"
             }
             value={query}
             onChange={(e) => onSetQuery(e.target.value)}
@@ -374,13 +510,17 @@ export function LibraryView({
           )}
         </label>
         <span className="muted">
-          {view === "artists"
+          {view === "artists" || filter === "artists"
             ? `${libraryArtists.length} ${libraryArtists.length === 1 ? "artist" : "artists"}`
-            : view === "albums"
+            : view === "albums" || filter === "albums"
               ? `${libraryAlbums.length} ${libraryAlbums.length === 1 ? "album" : "albums"}`
-              : view === "library"
-                ? `${collections.filter((c) => c.playlist).length} ${collections.filter((c) => c.playlist).length === 1 ? "playlist" : "playlists"}`
-                : `${visible.length} ${visible.length === 1 ? "track" : "tracks"}`}
+              : view === "library" && filter === "songs"
+                ? `${favoriteTracks.length} ${favoriteTracks.length === 1 ? "song" : "songs"}`
+                : view === "library" && (filter === "playlists" || !isMobile)
+                  ? `${totalPlaylistsCount} ${totalPlaylistsCount === 1 ? "playlist" : "playlists"}`
+                  : view === "library"
+                    ? `${totalPlaylistsCount + libraryArtists.length + libraryAlbums.length} items`
+                    : `${visible.length} ${visible.length === 1 ? "track" : "tracks"}`}
         </span>
         {!mobile && view !== "artists" && view !== "albums" && view !== "library" && !isPlaylistOrFavorites && (
           <button
@@ -394,7 +534,7 @@ export function LibraryView({
         )}
       </section>
 
-      {view === "albums" ? (
+      {view === "albums" || (view === "library" && filter === "albums") ? (
         <section aria-label="Albums in your library" className="albums-grid discover-albums">
           {libraryAlbums.length ? (
             libraryAlbums.map((album) => (
@@ -426,13 +566,14 @@ export function LibraryView({
             <p className="subtitle" style={{ padding: "20px 0" }}>No albums found in your library.</p>
           )}
         </section>
-      ) : view === "artists" ? (
+      ) : view === "artists" || (view === "library" && filter === "artists") ? (
         <section aria-label="Artists in your library" className="discover-portrait-grid">
           {libraryArtists.length ? (
             libraryArtists.map((artist) => (
               <div
                 className="portrait-card"
                 key={artist.id}
+                data-artist-id={artist.id}
                 onClick={() => onNavigateArtist?.(artist.id)}
                 role="button"
                 onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.currentTarget.click(); } }}
@@ -444,7 +585,7 @@ export function LibraryView({
                 </div>
                 <div className="portrait-card-info" style={{ textAlign: "center" }}>
                   <div className="portrait-card-title" title={artist.name}>{artist.name}</div>
-                  <div className="portrait-card-artist">Favorite artist</div>
+                  <div className="portrait-card-artist">Artist</div>
                 </div>
               </div>
             ))
@@ -452,15 +593,28 @@ export function LibraryView({
             <p className="subtitle" style={{ padding: "20px 0" }}>No artists found in your library.</p>
           )}
         </section>
-      ) : view === "library" ? (
+      ) : view === "library" && filter !== "songs" ? (
         <Collections
-          collections={collections.filter(collection => collection.playlist)}
+          collections={filter === "playlists" ? collections.filter(collection => collection.playlist) : collections}
           query={query}
           open={(id) => {
             onSelectView(id);
             onSetQuery("");
           }}
           onPlayCollection={onPlayCollection}
+          likedSongs={{
+            count: session.favorites.length,
+            onOpen: () => onSelectView("favorites"),
+            onPlay: onPlayAll,
+          }}
+          artists={(isMobile || mobile) && filter === null ? {
+            items: favoriteArtistCards,
+            onOpen: (id) => { onNavigateArtist?.(id); },
+          } : undefined}
+          albums={(isMobile || mobile) && filter === null ? {
+            items: session.favoriteAlbums,
+            onOpen: (id, title) => { if (id) onNavigateAlbum?.(id); else onSetQuery(title || ""); },
+          } : undefined}
         />
       ) : !tracks.length ? (
         <section className="welcome">
@@ -496,31 +650,31 @@ export function LibraryView({
             </p>
           )}
         </section>
-      ) : !visible.length ? (
-        <div className={`empty ${isPlaylistOrFavorites ? "playlist-empty-card" : ""}`}>
+      ) : !displayRows.length ? (
+        <div className={`empty ${isPlaylistOrFavorites || filter === "songs" ? "playlist-empty-card" : ""}`}>
           <Search size={30} />
           <h2>
             {query
               ? "No matching music"
-              : view === "favorites"
+              : view === "favorites" || filter === "songs"
                 ? "Your favorites start here"
                 : "An empty playlist"}
           </h2>
           <p>
             {query
               ? "Try a different title, artist, or album."
-              : view === "favorites"
+              : view === "favorites" || filter === "songs"
                 ? "Tap a heart beside a track to save it here."
                 : "Add tracks from Discover or your library to build this playlist."}
           </p>
-          {!query && isPlaylistOrFavorites && (
+          {!query && (isPlaylistOrFavorites || filter === "songs") && (
             <div className="playlist-empty-actions">
               <button
                 className="primary"
                 onClick={() => {
                   if (playlist && onOpenAddMusic) {
                     onOpenAddMusic(playlist);
-                  } else if (view === "favorites" && onOpenAddMusic) {
+                  } else if ((view === "favorites" || filter === "songs") && onOpenAddMusic) {
                     onOpenAddMusic({
                       id: "favorites",
                       name: "Your favorites",
@@ -555,10 +709,18 @@ export function LibraryView({
             <span />
           </div>
           <div className="track-list">
-            {rows.map(({ t, entryId }, index) => (
+            {displayRows.map(({ t, entryId }, index) => (
               <div
                 className={`track-row ${currentTrack?.id === t.id ? "current" : ""}`}
                 key={entryId}
+                onClick={(e) => {
+                  if ((e.target as HTMLElement).closest("button, a, summary, details, input, .track-actions, .menu-popover")) return;
+                  if (filter === "songs" && onPlayCollection) {
+                    onPlayCollection({ id: "favorites", name: "Liked Songs", description: "", tracks: displayRows.map(r => r.t) });
+                  } else {
+                    onPlayTrackInList(t, index);
+                  }
+                }}
               >
                 <button
                   className="track-play"
@@ -578,15 +740,22 @@ export function LibraryView({
                   )}
                 </button>
                 <div className="track-meta">
-                  <Artwork
-                    url={t.artworkUrl}
-                    className={`color-${index % 5}`}
-                  />
+                  <div className="track-cover-container">
+                    <Artwork
+                      url={t.artworkUrl}
+                      className={`color-${index % 5}`}
+                    />
+                    {(downloads[t.id] === "downloading" || (t.metadataSourceId ? downloads[t.metadataSourceId] === "downloading" : false)) && (
+                      <div className="track-cover-download-overlay" title="Downloading…" role="img" aria-label="Downloading">
+                        <div className="track-cover-spinner spin" />
+                      </div>
+                    )}
+                  </div>
                   <span className="track-meta-text">
                     <button className="track-title-button" aria-label={`Listen to ${t.title}`} onClick={() => onPlayTrackInList(t, index)}><strong dir="auto" title={t.title}>{t.title}</strong></button>
                     <small dir="auto">
                       <DownloadedBadge track={t} />
-                      <ArtistLinks artistString={t.artist} onNavigateArtist={onNavigateArtist} />
+                      <ArtistLinks artistString={t.artist} catalogId={t.metadataSourceId} onNavigateArtist={onNavigateArtist} />
                       {` · ${t.offline ? "Offline" : t.format === "catalog" ? "Imported · resolves when played" : t.source ? "Online" : "Local file"}${t.format === "catalog" ? "" : ` · ${t.format}`}`}
                       {t.missing ? " · File missing" : ""}
                     </small>

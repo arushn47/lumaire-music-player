@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use tauri::ipc::Channel;
 static GENERATION: AtomicU64 = AtomicU64::new(0);
 
+#[cfg_attr(target_os = "android", allow(dead_code))]
 fn waveform(samples: &[f32]) -> [f32; 24] {
     std::array::from_fn(|index| {
         let start = index * samples.len() / 24;
