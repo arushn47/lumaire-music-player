@@ -8,13 +8,13 @@
 
 A local-first music player for Windows and Android, with a dedicated lyric room and a quiet, customizable interface.
 
-[Downloads](https://github.com/arushn47/music-player/releases) · [Features](#features) · [Build from source](#build-from-source) · [Report an issue](https://github.com/arushn47/music-player/issues)
+[Downloads](https://github.com/arushn47/lumaire-music-player/releases) · [Features](#features) · [Build from source](#build-from-source) · [Report an issue](https://github.com/arushn47/lumaire-music-player/issues)
 
 </div>
 
 ## Download
 
-Download installers from **[this repository's GitHub Releases](https://github.com/arushn47/music-player/releases)**. Each release should identify its source tag, included platforms, changes, known issues and SHA-256 checksums. If no release is listed, no public download is available there yet.
+Download **[Lumaire v1.0.8 for Windows and Android](https://github.com/arushn47/lumaire-music-player/releases/tag/v1.0.8)**. The release includes both platform packages, clear release notes and SHA-256 checksums.
 
 | Platform | Download to choose | Requirements |
 | --- | --- | --- |
@@ -32,16 +32,18 @@ Only the listed platforms are currently packaged. An APK is installed directly o
 To verify a downloaded file in PowerShell:
 
 ```powershell
-Get-FileHash .\Lumaire-1.0.4-Android-arm64.apk -Algorithm SHA256
+Get-FileHash .\Lumaire-1.0.8-Android-arm64.apk -Algorithm SHA256
 ```
 
 Compare the result with that release's `SHA256SUMS.txt`. A checksum detects a changed download; it does not by itself prove that software is safe.
 
 ### Release status
 
-Lumaire is under active development. The existing 1.0.4 preview APK was installed and launched on a Motorola Edge 50 Pro; broad mobile feature testing remains incomplete. The existing preview EXE/APK files predate the Windows updater implementation.
+Lumaire v1.0.8 is available for Windows x64 and Android ARM64. It improves lyric following, artist profiles, Android playback recovery, and the update/setup controls.
 
-Manual Windows updates through **Settings → About** are implemented in source. GitHub-hosted signing/publication and a complete installed-app upgrade still require verification. Android uses manual APK installation; it does not use the Windows updater. The streaming engine is maintained separately inside Lumaire: Windows and Android check official stable yt-dlp releases at most daily, verify downloads, and retain a fallback if an update fails. This does not require a YouTube account or browser cookies.
+Installed Windows releases check for updates at launch. Use the update indicator or **Settings → About** to download; the highlighted action stays visible while release notes scroll. Choose **Restart & Update** when you are ready. Android uses manual APK installation from the same release page. Keep your existing installation to preserve your library and settings; Android signing certificates must match.
+
+The streaming engine is maintained separately: Windows and Android check official stable yt-dlp releases at most daily, verify downloads, and retain a fallback if an update fails. This does not require a YouTube account or browser cookies.
 
 ## Features
 
@@ -87,9 +89,9 @@ For Android, install Android Studio, its Java runtime, Android SDK and NDK, then
 
 ## Feedback and project information
 
-Use [GitHub Issues](https://github.com/arushn47/music-player/issues) for bugs and feature requests. Include your app version, platform, steps to reproduce and a redacted error message. Platform-specific failures are easier to fix when a report identifies whether it concerns local files, streaming or lyrics.
+Use [GitHub Issues](https://github.com/arushn47/lumaire-music-player/issues) for bugs and feature requests. Include your app version, platform, steps to reproduce and a redacted error message. Platform-specific failures are easier to fix when a report identifies whether it concerns local files, streaming or lyrics.
 
-- [Release history and downloads](https://github.com/arushn47/music-player/releases)
+- [Release history and downloads](https://github.com/arushn47/lumaire-music-player/releases)
 - [Windows build workflow](.github/workflows/windows-release.yml)
 - [Third-party notices](THIRD_PARTY_NOTICES.md) and [license texts](THIRD_PARTY_LICENSES.txt)
 
