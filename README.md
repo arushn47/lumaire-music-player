@@ -1,68 +1,89 @@
-<div align="center">
+<p align="center">
+  <img src=".github/readme/hero.svg" alt="Lumaire — Your music. Your words. A little closer." width="100%" />
+</p>
 
-<img src="public/lumaire.svg" alt="Lumaire" width="80" height="80" />
+<h1 align="center">Your music, with room for the words.</h1>
+<p align="center">A local-first player for your library, online discoveries and the lyrics you love.<br />Made for Windows and Android. No Lumaire account needed.</p>
 
-# Lumaire
+<!-- release-downloads:start -->
+<p align="center"><strong>Latest release · v1.0.8</strong></p>
+<p align="center">
+  <a href="https://github.com/arushn47/lumaire-music-player/releases/download/v1.0.8/Lumaire_1.0.8_x64-setup.exe"><img src=".github/readme/windows.svg" alt="Download Lumaire v1.0.8 for Windows x64 — EXE installer" width="272" height="72" /></a>
+  <a href="https://github.com/arushn47/lumaire-music-player/releases/download/v1.0.8/Lumaire-1.0.8-Android-arm64.apk"><img src=".github/readme/android.svg" alt="Download Lumaire v1.0.8 for Android ARM64 — signed APK" width="272" height="72" /></a>
+</p>
+<p align="center">Windows x64 + WebView2 · Android 8.0+ / ARM64</p>
+<p align="center"><a href="https://github.com/arushn47/lumaire-music-player/releases/download/v1.0.8/SHA256SUMS.txt">Verify checksums</a> · <a href="https://github.com/arushn47/lumaire-music-player/releases/tag/v1.0.8">What's new in v1.0.8</a> · <a href="https://github.com/arushn47/lumaire-music-player/releases">All releases</a></p>
+<!-- release-downloads:end -->
 
-**Your music. Your words. A little closer.**
+<p align="center"><a href="#a-look-inside">A look inside</a> · <a href="#made-for-listening">Features</a> · <a href="#installing--updating">Install & update</a> · <a href="#build-from-source">Build from source</a></p>
 
-A local-first music player for Windows and Android, with a dedicated lyric room and a quiet, customizable interface.
+## A look inside
 
-[Downloads](https://github.com/arushn47/lumaire-music-player/releases) · [Features](#features) · [Build from source](#build-from-source) · [Report an issue](https://github.com/arushn47/lumaire-music-player/issues)
+<p align="center"><img src=".github/readme/desktop.png" alt="Lumaire on Windows: a local music library, playlists and playback controls" width="100%" /></p>
+<p align="center"><img src=".github/readme/android.png" alt="Lumaire on Android: the mobile library and playback controls" width="300" /></p>
+<p align="center"><sub>Interface previews with demo tracks. No recordings are bundled.</sub></p>
 
-</div>
+## Made for listening
 
-## Download
+| Your collection, together | The words, right there |
+| --- | --- |
+| Local files, favorites, playlists and a playback queue. Your library stays on your device. | A dedicated lyric room with synchronized lyrics, romanization and optional translation. |
+| **Something new to play** | **Carry it between devices** |
+| Search artists, albums and recordings. Matching artist profiles combine only when recording evidence confirms the identity. | Share playlists, favorites and listening history between your phone and PC on the same Wi-Fi. |
+| **Make it feel like yours** | **Pick up where you left off** |
+| Light and dark themes, accent colors, cover art and a listening tracker. | Android saves your position when you close the app. Switching apps or locking the screen lets the music continue. |
 
-Download **[Lumaire v1.0.8 for Windows and Android](https://github.com/arushn47/lumaire-music-player/releases/tag/v1.0.8)**. The release includes both platform packages, clear release notes and SHA-256 checksums.
+Local files work offline. Discovery, streaming and lyric services need a connection; availability depends on the provider and recording.
 
-| Platform | Download to choose | Requirements |
-| --- | --- | --- |
-| Windows | Windows x64 setup `.exe` | 64-bit Windows with Microsoft WebView2; the installer can download WebView2 if needed |
-| Android | Signed ARM64 `.apk` | Android 8.0 or later, ARM64 device |
+## What's better in v1.0.8
 
-Only the listed platforms are currently packaged. An APK is installed directly on Android; it is not a Windows installer. Linux, macOS, iOS and other Android architectures are not currently distributed.
+- **Lyrics stay with the song.** Automatic scrolling no longer quietly pauses following.
+- **Cleaner artist searches.** Fewer collaboration entries, safely combined profiles and favorites that recognize either original identity.
+- **A smoother Android return.** Playback position is saved on close, and the media notification opens the app again.
+- **Updates you can find.** A highlighted download action stays visible while notes scroll, with clearer playback-engine setup and retry controls.
 
-### Install and verify
+[Read the full release notes →](https://github.com/arushn47/lumaire-music-player/releases/tag/v1.0.8)
 
-**Windows:** run the setup EXE. Current installers do not have an Authenticode publisher certificate, so Windows may show an unknown-publisher warning. Check the repository, release notes and checksum before deciding whether to install; do not disable system protection globally.
+## Installing & updating
 
-**Android:** open the APK and allow installation from your chosen browser/file manager when Android asks. Future APKs must use the same package name and signing certificate to update the app without uninstalling it. A conflict with an old development build can also come from a work/private profile; uninstalling app copies deletes their private data.
+**Windows:** open the downloaded setup EXE. Existing releases can also download the update from the update indicator or **Settings → About**, then **Restart & Update** when you are ready. WebView2 is required; the installer can download it if needed.
 
-To verify a downloaded file in PowerShell:
+**Android:** open the signed ARM64 APK and confirm installation. Keep Lumaire installed to preserve your library and settings. Public updates must use the same signing certificate; a development build signed with another key cannot be upgraded with the public APK.
+
+<details>
+<summary><strong>Checksums, Windows publisher notice and platform support</strong></summary>
+
+Windows installers do not currently have an Authenticode publisher certificate, so Windows may show an unknown-publisher warning. Check the repository and release checksums before installing; do not disable system protection globally.
 
 ```powershell
 Get-FileHash .\Lumaire-1.0.8-Android-arm64.apk -Algorithm SHA256
 ```
 
-Compare the result with that release's `SHA256SUMS.txt`. A checksum detects a changed download; it does not by itself prove that software is safe.
+Compare the result with the release's `SHA256SUMS.txt`. A checksum detects a changed download; it does not by itself prove a file is safe.
 
-### Release status
+Current packages support Windows x64 and Android 8.0+ on ARM64. Linux, macOS, iOS and other Android architectures are not distributed.
 
-Lumaire v1.0.8 is available for Windows x64 and Android ARM64. It improves lyric following, artist profiles, Android playback recovery, and the update/setup controls.
+</details>
 
-Installed Windows releases check for updates at launch. Use the update indicator or **Settings → About** to download; the highlighted action stays visible while release notes scroll. Choose **Restart & Update** when you are ready. Android uses manual APK installation from the same release page. Keep your existing installation to preserve your library and settings; Android signing certificates must match.
+<details>
+<summary><strong>Online playback setup</strong></summary>
 
-The streaming engine is maintained separately: Windows and Android check official stable yt-dlp releases at most daily, verify downloads, and retain a fallback if an update fails. This does not require a YouTube account or browser cookies.
+Lumaire uses free playback components, including yt-dlp and QuickJS. Setup shows download progress, verification and retry controls. Windows and Android check official stable engine updates at most daily, verify downloads and retain a fallback if an update fails. No YouTube account or browser cookies are required.
 
-## Features
+Audio formats and availability depend on platform codecs, provider access and installed components.
 
-- **Your library:** local audio files, favorites, playlists and a playback queue.
-- **Discover:** catalog search with Lumaire artist and album pages. Metadata availability does not guarantee a playable source.
-- **Lyric room:** synchronized lyrics, romanization and optional translation, with language labels and controls for how lyrics are displayed.
-- **Listening tracker:** listening history and summaries of tracks, artists and albums.
-- **Appearance:** light/dark themes and configurable accents.
-- **Local storage:** library data and settings are stored on your device; no Lumaire account is required.
+</details>
 
-Audio formats and playback availability depend on the platform, codecs, provider access and installed optional components. Online discovery, streaming and lyric services require a connection. Local files remain usable offline.
+<details>
+<summary><strong>Privacy and online services</strong></summary>
 
-## Privacy and online services
+Lumaire has no required Lumaire account or analytics service. Your library, settings and listening history are stored on your device. Online services receive what they need for the feature you choose, such as search terms, track metadata or lyric text.
 
-Lumaire has no required Lumaire account or analytics service. Local library data and listening history are stored on the device. Online services receive information needed for the feature you use—for example search terms, track metadata or lyric text. Optional Gemini lyric processing sends text to Google's service and requires a user-supplied key. Provider terms, quotas and availability apply.
+Optional Gemini lyric processing sends text to Google's service and needs your own configured key. Provider terms, quotas and availability apply. Review online sources and lyric processing in Settings.
 
-Use Settings to review online sources and lyric processing. Never include API keys, listening databases, personal file paths or private signing keys in public bug reports.
+Lumaire is independent and is not affiliated with Apple, Google, YouTube, JioSaavn or other catalog providers. Music, artwork and lyrics belong to their respective rightsholders. Source availability and permission to use a recording are separate questions.
 
-Lumaire is an independent project and is not affiliated with Apple, Google, YouTube, JioSaavn or other catalog providers. Music, artwork and lyrics belong to their respective rightsholders. Source availability and permission to use a recording are separate questions.
+</details>
 
 ## Build from source
 
@@ -71,8 +92,8 @@ The frontend uses React, TypeScript and Vite. Native functionality uses Tauri 2,
 For Windows, install Node.js, stable Rust, MSVC Build Tools, Windows SDK and Microsoft WebView2, then:
 
 ```powershell
-git clone https://github.com/arushn47/music-player.git
-cd music-player
+git clone https://github.com/arushn47/lumaire-music-player.git
+cd lumaire-music-player
 npm ci
 npm run desktop
 ```
@@ -87,12 +108,17 @@ The Tauri wrapper uses the installed CLI and a project-local Cargo cache. Window
 
 For Android, install Android Studio, its Java runtime, Android SDK and NDK, then run `npm run android:doctor`. `npm run android:build` builds a development ARM64 APK; it is not the public release APK. Keep Android signing material private and reuse the existing release key for updates.
 
-## Feedback and project information
+Before tagging a new release, run `node scripts/update-readme-downloads.mjs` after updating the app version. CI checks that the displayed version, button labels and direct download links match.
 
-Use [GitHub Issues](https://github.com/arushn47/lumaire-music-player/issues) for bugs and feature requests. Include your app version, platform, steps to reproduce and a redacted error message. Platform-specific failures are easier to fix when a report identifies whether it concerns local files, streaming or lyrics.
+## Feedback & project information
 
-- [Release history and downloads](https://github.com/arushn47/lumaire-music-player/releases)
-- [Windows build workflow](.github/workflows/windows-release.yml)
-- [Third-party notices](THIRD_PARTY_NOTICES.md) and [license texts](THIRD_PARTY_LICENSES.txt)
+Found a bug or have an idea? [Open an issue](https://github.com/arushn47/lumaire-music-player/issues) with your app version, platform and steps to reproduce it. Redact personal information; never include API keys, databases or signing keys.
 
-Dependency licenses apply to their respective components. This repository does not yet declare a distribution license for Lumaire's original code; no license badge or blanket open-source claim is made here.
+[Release history](https://github.com/arushn47/lumaire-music-player/releases) · [Windows release workflow](.github/workflows/windows-release.yml) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Dependency licenses](THIRD_PARTY_LICENSES.txt)
+
+<details>
+<summary>About licensing</summary>
+
+Dependency licenses apply to their respective components. This repository does not yet declare a distribution license for Lumaire's original code; no blanket open-source license is implied.
+
+</details>

@@ -44,7 +44,10 @@ jobs:
         run: npm ci
 
       - name: Validate release configuration and tag
-        run: node scripts/check-windows-release.mjs
+        run: |
+          node scripts/update-readme-downloads.mjs --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/check-windows-release.mjs
 
       - name: Require signing secrets
         env:

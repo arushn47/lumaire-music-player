@@ -1,3 +1,10 @@
+## README Download and Presentation Refresh (2 November 2026)
+
+- Added a branded SVG header, prominent Windows EXE and Android APK download buttons, and desktop/mobile previews made with demo tracks and original artwork. No personal library data or recordings are included. Current v1.0.8 highlights are near the top; longer installation, engine, privacy and licensing details are collapsed.
+- Download links point directly to the existing verified v1.0.8 release assets. `node scripts/update-readme-downloads.mjs` refreshes links and SVG labels from the app version; the Windows release workflow checks them before packaging. Checks normalize Windows line endings.
+- Verified GitHub-sanitized Markdown in a real browser at 390px and 1280px in light/dark themes: all five images load, both download buttons exist, details start collapsed and content has no horizontal overflow. Preview screenshots were visually reviewed. Download/version assertions, release configuration validation, both release-validator self-checks and diff whitespace checks passed.
+- Documentation/assets only; no app binaries changed or rebuilt, and frontend/Rust suites were not rerun. GitHub does not permit arbitrary README CSS or scripts, so the design uses supported HTML and local images.
+
 ## v1.0.8 Published for Windows and Android (2 November 2026)
 
 - Published combined stable release: https://github.com/arushn47/lumaire-music-player/releases/tag/v1.0.8 . Source tag v1.0.8 points to 2b71dddc902d409435c58fdda308c7ffcf8461a7. Windows workflow 41396251122 succeeded and verified its draft assets against the build. Both platform binaries, the Windows updater signature, latest.json and SHA256SUMS.txt are attached.

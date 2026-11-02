@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-label="Lumaire. Your music. Your words. A little closer.">
+<title>Lumaire — your music, your words</title>
+<rect width="1280" height="340" rx="24" fill="#121218"/>
+<g transform="translate(74 72)"><path d="M12 72V49a48 48 0 0 1 96 0v23" fill="none" stroke="#b5a0f3" stroke-width="11" stroke-linecap="round"/><rect x="5" y="58" width="25" height="45" rx="10" fill="#b5a0f3"/><rect x="90" y="58" width="25" height="45" rx="10" fill="#b5a0f3"/><circle cx="60" cy="97" r="7" fill="#b5a0f3"/></g>
+<text x="240" y="158" fill="#f5f3fa" font-family="Georgia,serif" font-size="92" font-weight="700" letter-spacing="-4">Lumaire.</text>
+<text x="76" y="235" fill="#d1cbdc" font-family="Segoe UI,Arial,sans-serif" font-size="28">Your music. Your words. A little closer.</text>
+<text x="76" y="287" fill="#b5a0f3" font-family="Segoe UI,Arial,sans-serif" font-size="19">Local-first listening for Windows and Android</text>
+<g transform="translate(955 93)" stroke="#b5a0f3" stroke-width="8" stroke-linecap="round"><path d="M0 54v32M24 31v78M48 8v124M72 40v60M96 20v100M120 52v36M144 34v72M168 58v24"/></g>
+</svg>
