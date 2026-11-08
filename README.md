@@ -90,10 +90,3 @@ Lumaire is independent and is not affiliated with Apple, Google, YouTube, JioSaa
 Found a bug or have an idea? [Open an issue](https://github.com/arushn47/lumaire-music-player/issues) with your app version, platform and steps to reproduce it. Redact personal information; never include API keys, databases or signing keys.
 
 [Release history](https://github.com/arushn47/lumaire-music-player/releases) · [Release notes](docs/RELEASE_NOTES.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md) · [Dependency licenses](docs/THIRD_PARTY_LICENSES.txt)
-
-<details>
-<summary>About licensing</summary>
-
-Dependency licenses apply to their respective components. This repository does not yet declare a distribution license for Lumaire's original code; no blanket open-source license is implied.
-
-</details>
