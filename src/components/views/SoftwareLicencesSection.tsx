@@ -45,8 +45,8 @@ export function SoftwareLicencesSection() {
       setLoading(true);
       setError("");
       Promise.all([
-        import("../../../THIRD_PARTY_NOTICES.md?raw"),
-        import("../../../THIRD_PARTY_LICENSES.txt?raw"),
+        import("../../../docs/THIRD_PARTY_NOTICES.md?raw"),
+        import("../../../docs/THIRD_PARTY_LICENSES.txt?raw"),
       ])
         .then(([notices, licences]) => {
           setRawNotices(notices.default);

@@ -32,7 +32,15 @@ research/phase1-results.json
 .DS_Store
 Thumbs.db
 
-/docs/
+/docs/*
+!/docs/RELEASE_NOTES.md
+!/docs/THIRD_PARTY_LICENSES.txt
+!/docs/THIRD_PARTY_NOTICES.md
+/AGENTS.md
+/RELEASE_NOTES.md
+/TESTING.md
+/THIRD_PARTY_LICENSES.txt
+/THIRD_PARTY_NOTICES.md
 
 # Distribute binaries as GitHub Release assets, not source commits.
 /release/*

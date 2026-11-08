@@ -55,8 +55,8 @@
       "icons/128x128.png"
     ],
     "resources": {
-      "../THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
-      "../THIRD_PARTY_LICENSES.txt": "THIRD_PARTY_LICENSES.txt"
+      "../docs/THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md",
+      "../docs/THIRD_PARTY_LICENSES.txt": "THIRD_PARTY_LICENSES.txt"
     },
     "windows": {
       "webviewInstallMode": {

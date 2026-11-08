@@ -114,7 +114,7 @@ Before tagging a new release, run `node scripts/update-readme-downloads.mjs` aft
 
 Found a bug or have an idea? [Open an issue](https://github.com/arushn47/lumaire-music-player/issues) with your app version, platform and steps to reproduce it. Redact personal information; never include API keys, databases or signing keys.
 
-[Release history](https://github.com/arushn47/lumaire-music-player/releases) · [Windows release workflow](.github/workflows/windows-release.yml) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Dependency licenses](THIRD_PARTY_LICENSES.txt)
+[Release history](https://github.com/arushn47/lumaire-music-player/releases) · [Release notes](docs/RELEASE_NOTES.md) · [Third-party notices](docs/THIRD_PARTY_NOTICES.md) · [Dependency licenses](docs/THIRD_PARTY_LICENSES.txt)
 
 <details>
 <summary>About licensing</summary>

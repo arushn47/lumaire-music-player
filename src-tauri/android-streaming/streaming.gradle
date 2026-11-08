@@ -19,8 +19,8 @@ if (enabled) {
         from(new File(repo, 'src-tauri/gen/android/app/build/generated/background-policy')) { into 'assets' }
         from(cache) { include 'yt_dlp-2026.8.19-py3-none-any.whl', 'yt_dlp_ejs-0.8.0-py3-none-any.whl'; into 'assets/python-wheels' }
         from(new File(cache, 'qjs-build/qjs')) { into 'jniLibs/arm64-v8a'; rename { 'libqjs.so' } }
-        from(new File(repo, 'THIRD_PARTY_LICENSES.txt')) { into 'assets/licenses' }
-        from(new File(repo, 'THIRD_PARTY_NOTICES.md')) { into 'assets/licenses' }
+        from(new File(repo, 'docs/THIRD_PARTY_LICENSES.txt')) { into 'assets/licenses' }
+        from(new File(repo, 'docs/THIRD_PARTY_NOTICES.md')) { into 'assets/licenses' }
         into layout.buildDirectory.dir('generated/streaming')
         doFirst {
             ['yt_dlp-2026.8.19-py3-none-any.whl', 'yt_dlp_ejs-0.8.0-py3-none-any.whl', 'qjs-build/qjs'].each {

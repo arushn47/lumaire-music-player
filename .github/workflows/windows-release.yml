@@ -95,8 +95,8 @@ jobs:
       - name: Load reviewed release notes
         id: notes
         run: |
-          $releaseNotesText = Get-Content -Raw -LiteralPath 'RELEASE_NOTES.md'
-          if (-not $releaseNotesText.StartsWith("# Lumaire $env:RELEASE_TAG" + "`n") -and -not $releaseNotesText.StartsWith("# Lumaire $env:RELEASE_TAG" + "`r`n")) { throw 'Finalize RELEASE_NOTES.md with the exact release tag before publishing.' }
+          $releaseNotesText = Get-Content -Raw -LiteralPath 'docs/RELEASE_NOTES.md'
+          if (-not $releaseNotesText.StartsWith("# Lumaire $env:RELEASE_TAG" + "`n") -and -not $releaseNotesText.StartsWith("# Lumaire $env:RELEASE_TAG" + "`r`n")) { throw 'Finalize docs/RELEASE_NOTES.md with the exact release tag before publishing.' }
           $notesDelimiter = [guid]::NewGuid().ToString()
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "body<<$notesDelimiter"
           Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value $releaseNotesText

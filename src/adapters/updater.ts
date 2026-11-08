@@ -1,7 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { getVersion } from "@tauri-apps/api/app";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import bundledNotes from "../../RELEASE_NOTES.md?raw";
+import bundledNotes from "../../docs/RELEASE_NOTES.md?raw";
 import config from "../../src-tauri/tauri.conf.json";
 
 export type UpdateStage = "idle" | "development" | "checking" | "unconfigured" | "current" | "available" | "downloading" | "ready" | "restarting" | "error";

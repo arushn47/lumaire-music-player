@@ -5,7 +5,7 @@ Generated from the resolved lockfiles. This inventory does not grant rights to a
 ## Offline language detection
 
 The bundled native language detector runs locally without accounts or API calls.
-Full licence texts are included in THIRD_PARTY_LICENSES.txt.
+Full licence texts are included in [THIRD_PARTY_LICENSES.txt](THIRD_PARTY_LICENSES.txt).
 
 | Package | Version | Licence | Build/test only |
 |---|---|---|---|
