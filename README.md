@@ -15,7 +15,7 @@
 <p align="center"><a href="https://github.com/arushn47/lumaire-music-player/releases/download/v1.0.8/SHA256SUMS.txt">Verify checksums</a> · <a href="https://github.com/arushn47/lumaire-music-player/releases/tag/v1.0.8">What's new in v1.0.8</a> · <a href="https://github.com/arushn47/lumaire-music-player/releases">All releases</a></p>
 <!-- release-downloads:end -->
 
-<p align="center"><a href="#a-look-inside">A look inside</a> · <a href="#made-for-listening">Features</a> · <a href="#installing--updating">Install & update</a> · <a href="#build-from-source">Build from source</a></p>
+<p align="center"><a href="#a-look-inside">A look inside</a> · <a href="#made-for-listening">Features</a> · <a href="#installing--updating">Install & update</a></p>
 
 ## A look inside
 
@@ -84,31 +84,6 @@ Optional Gemini lyric processing sends text to Google's service and needs your o
 Lumaire is independent and is not affiliated with Apple, Google, YouTube, JioSaavn or other catalog providers. Music, artwork and lyrics belong to their respective rightsholders. Source availability and permission to use a recording are separate questions.
 
 </details>
-
-## Build from source
-
-The frontend uses React, TypeScript and Vite. Native functionality uses Tauri 2, Rust and SQLite.
-
-For Windows, install Node.js, stable Rust, MSVC Build Tools, Windows SDK and Microsoft WebView2, then:
-
-```powershell
-git clone https://github.com/arushn47/lumaire-music-player.git
-cd lumaire-music-player
-npm ci
-npm run desktop
-```
-
-```powershell
-npm run build           # Production frontend
-npm test                # Frontend/domain regression tests
-npm run desktop:installer  # Local Windows NSIS installer
-```
-
-The Tauri wrapper uses the installed CLI and a project-local Cargo cache. Windows release signing is enabled only with the explicit release overlay. The [Windows release workflow](.github/workflows/windows-release.yml) builds and verifies updater artifacts; ordinary local builds do not require signing secrets.
-
-For Android, install Android Studio, its Java runtime, Android SDK and NDK, then run `npm run android:doctor`. `npm run android:build` builds a development ARM64 APK; it is not the public release APK. Keep Android signing material private and reuse the existing release key for updates.
-
-Before tagging a new release, run `node scripts/update-readme-downloads.mjs` after updating the app version. CI checks that the displayed version, button labels and direct download links match.
 
 ## Feedback & project information
 
