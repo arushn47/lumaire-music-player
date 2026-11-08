@@ -4,10 +4,10 @@
 
 ## Before You Start
 
-1. **Read first:** `docs/CURRENT-STATUS.md` for current work state and next steps
-2. **Check Git:** Run `git status` and `git diff` to see uncommitted changes
+1. **Check Git:** Run `git status` and `git diff` to see uncommitted changes
+2. **Local status note:** Read `docs/CURRENT-STATUS.md` when it exists in this checkout; it is an ignored local file and is not part of a fresh clone
 3. **Never reset:** Preserve all WIP, especially partial implementations
-4. **Update status:** After meaningful changes, update `docs/CURRENT-STATUS.md`
+4. **Update status:** After meaningful changes, update the local status note when present; do not add it to the public repository
 
 ## Architecture Boundaries
 

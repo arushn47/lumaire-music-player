@@ -271,7 +271,7 @@ These engines run locally and load only when needed. Japanese uses the bundled K
 
 ### Optional MusicBrainz metadata and official Apple charts
 
-Artist/release-group metadata may be retrieved from the public [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), with source attribution and MusicBrainz request pacing. Apple's public RSS charts identify whether the source is Apple Music Most Played or iTunes Store Top Songs; metadata fallback uses the documented [iTunes Search API](https://performance-partners.apple.com/search-api). No SDK or provider source code is bundled by these integrations. Existing audio sources and audio rights are unchanged. ListenBrainz Fresh Releases was evaluated and is not a production request source. See docs/PROVIDER-EVALUATION.md for the integration limits and coverage observations.
+Artist/release-group metadata may be retrieved from the public [MusicBrainz API](https://musicbrainz.org/doc/MusicBrainz_API), with source attribution and MusicBrainz request pacing. Apple's public RSS charts identify whether the source is Apple Music Most Played or iTunes Store Top Songs; metadata fallback uses the documented [iTunes Search API](https://performance-partners.apple.com/search-api). No SDK or provider source code is bundled by these integrations. Existing audio sources and audio rights are unchanged. ListenBrainz Fresh Releases was evaluated and is not a production request source.
 
 ## Local pairing QR encoder
 
