@@ -21,7 +21,9 @@
     "android:build": "node scripts/android.mjs build --debug --target aarch64",
     "android:dev": "node scripts/android.mjs dev",
     "test:android": "node scripts/android-test.mjs",
-    "fixtures": "node scripts/fixtures.mjs"
+    "fixtures": "node scripts/fixtures.mjs",
+    "site:dev": "npm --prefix website run dev",
+    "site:build": "npm --prefix website run build"
   },
   "dependencies": {
     "@indic-transliteration/sanscript": "1.3.3",
